@@ -88,6 +88,5 @@ srun --mem=0 torchrun \
     --rdzv_id="$SLURM_JOB_ID" \
     --rdzv_endpoint="$MASTER_ADDR":"$MASTER_PORT" \
     --rdzv_backend=c10d \
-    st_trainer_ddp_hf.py --resume_checkpoint_path /rhome/sawale/indus_traning/sentense_transformers/model_exploration/tmp_models/nrows_None__nsrc_None/timestamp_20250505_16-10-36/indus-sde-v0.2/checkpoints/checkpoint-82000 --resume_run_id 9olox5mz --batch_size 16 --gradient_accumulation_steps 32
-
+    st_trainer_ddp_hf.py --batch_size 32 --gradient_accumulation_steps 16 --lr 3.0e-5
 echo "<<<<<< test python file"

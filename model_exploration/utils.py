@@ -24,6 +24,7 @@ from dotenv import load_dotenv
 import distributed
 from distributed import init_ddp, print0
 from torch.nn.parallel import DistributedDataParallel
+from sentence_transformers.data_collator import SentenceTransformerDataCollator
 
     
 def get_gpu_info():
@@ -589,3 +590,82 @@ class RetrievalTimer:
         print(f"Avg query‑search time:      {td['avg_query_search_s']*1000:.2f} ms")
         print(f"Avg query‑retrieval time:   {td['avg_query_retrieval_s']*1000:.2f} ms")  # ← new
         print(f"Total per‑query time:       {(td['avg_query_retrieval_s'])*1000:.2f} ms")
+
+
+
+class PreTokenizedPyTorchDataset(torch.utils.data.Dataset):
+    """
+    Wraps a HF Dataset with tokenized columns into a torch Dataset.
+    Expects each example to have at least:
+      - anchor_input_ids, anchor_attention_mask
+      - positive_input_ids, positive_attention_mask
+    Optionally:
+      - negative_input_ids, negative_attention_mask
+    """
+    def __init__(self, hf_split):
+        self.ds = hf_split
+
+    def __len__(self):
+        return len(self.ds)
+
+    def __getitem__(self, idx):
+        return self.ds[idx]
+    
+    def __getattr__(self, name):
+        # Forward any missing attribute to the HF Dataset
+        return getattr(self.ds, name)
+    
+
+class PreTokenizedCollator(SentenceTransformerDataCollator):
+    """
+    Collate_fn that batches pre‑tokenized anchor/positive pairs,
+    and optionally negatives if present.
+    Returns:
+      - ([anchors, positives], None)        if no negatives
+      - ([anchors, positives, negatives], None) if negatives exist
+    """
+    def __init__(self, tokenize_fn = None, **kwargs):
+        # Provide a dummy tokenizer if none is given, as parent expects it.
+        _tokenize_fn = tokenize_fn if tokenize_fn is not None else lambda x: x
+        super().__init__(tokenize_fn=_tokenize_fn, **kwargs)
+
+    # Trainer inspects this to know “I have no label columns”
+    def __call__(self, features):
+        column_names = list(features[0].keys())
+
+        # batch: list of examples (each example is a dict of lists of length max_len)
+        # stack them into tensors of shape (batch_size, max_len)
+        anchor_ids   = torch.stack([torch.tensor(ex["anchor_input_ids"],      dtype=torch.long) for ex in features])
+        anchor_mask  = torch.stack([torch.tensor(ex["anchor_attention_mask"], dtype=torch.long) for ex in features])
+        positive_ids = torch.stack([torch.tensor(ex["positive_input_ids"],      dtype=torch.long) for ex in features])
+        positive_mask= torch.stack([torch.tensor(ex["positive_attention_mask"], dtype=torch.long) for ex in features])
+
+        batch = {
+            "anchor_input_ids":      anchor_ids,
+            "anchor_attention_mask": anchor_mask,
+            "positive_input_ids":      positive_ids,
+            "positive_attention_mask": positive_mask,
+        }
+
+        if "dataset_name" in column_names:
+            column_names.remove("dataset_name")
+            batch["dataset_name"] = features[0]["dataset_name"]
+
+        if tuple(column_names) not in self._warned_columns:
+            self.maybe_warn_about_column_order(column_names)
+
+             # Extract the label column if it exists
+        for label_column in self.valid_label_columns:
+            if label_column in column_names:
+                batch["label"] = torch.tensor([row[label_column] for row in features])
+                column_names.remove(label_column)
+                break
+
+        # if negatives were provided
+        if "negative_input_ids" in features[0]:
+            neg_ids   = torch.stack([torch.tensor(ex["negative_input_ids"],      dtype=torch.long) for ex in features])
+            neg_mask  = torch.stack([torch.tensor(ex["negative_attention_mask"], dtype=torch.long) for ex in features])
+            batch["negative_input_ids"]      = neg_ids
+            batch["negative_attention_mask"] = neg_mask
+
+        return batch

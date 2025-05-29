@@ -1,4 +1,5 @@
 import os
+import math
 import argparse
 import datetime
 import random
@@ -10,12 +11,12 @@ from datasets import (
     DatasetDict,
     concatenate_datasets,
     get_dataset_config_names,
-    IterableDataset
+    IterableDataset,
 )
 import wandb
 import torch
 from sentence_transformers import SentenceTransformer, SentenceTransformerTrainer
-from sentence_transformers.losses import MultipleNegativesRankingLoss
+# from sentence_transformers.losses import MultipleNegativesRankingLoss
 from sentence_transformers.training_args import SentenceTransformerTrainingArguments, BatchSamplers
 from sentence_transformers.evaluation import InformationRetrievalEvaluator, TripletEvaluator, SequentialEvaluator
 from dotenv import load_dotenv
@@ -23,7 +24,7 @@ import distributed
 from distributed import init_ddp, print0
 from torch.nn.parallel import DistributedDataParallel
 
-from utils import build_dataset_configs, load_and_cache_datasets, prepare_evaluators, get_gpu_info
+from utils import build_dataset_configs, load_and_cache_datasets, prepare_evaluators, get_gpu_info, MultipleNegativesRankingLoss
 # ──────────────── Constants ────────────────
 
 parser = argparse.ArgumentParser(description="Sentence Transformer Training Config")
@@ -68,7 +69,7 @@ WARMUP_RATIO = args.warmup_ratio
 EVAL_AND_SAVE_STEPS = args.eval_and_save_steps
 MAX_DATAPOINTS_PER_SRC_FOR_EVAL = args.max_datapoints_per_src_for_eval
 N_DATA_SRC = args.n_data_src
-CACHE_DIR = f"../data/stage1_cache/NROWS_{NROWS}"
+CACHE_DIR = f"./data/stage1_cache/NROWS_{NROWS}"
 GRADIENT_ACCUMULATION_STEPS = args.gradient_accumulation_steps
 LEARNING_RATE = args.lr
 STREAMING = args.streaming
@@ -95,17 +96,25 @@ wandb_config = {
 bf16_supported = torch.cuda.is_bf16_supported()
 fp16_supported = torch.cuda.is_available()
 
+
+def compute_max_steps(n_samples):
+    if STREAMING:
+        world_size = int(os.environ["WORLD_SIZE"])
+        total_train_samples_one_epoch = sum([nsize.get("train", 0) for src_name, nsize in n_samples.items()])
+        effective_global_batch_size_for_update = BATCH_SIZE * world_size * GRADIENT_ACCUMULATION_STEPS
+        steps_per_epoch = math.ceil(total_train_samples_one_epoch / effective_global_batch_size_for_update)
+        max_steps = int(steps_per_epoch * NUM_TRAIN_EPOCHS)
+    else:
+        max_steps = -1
+
+    return max_steps
+
 # ──────────────── Main ────────────────
 def main(local_rank, rank):
     model   = SentenceTransformer(MODEL_NAME, tokenizer_kwargs={"model_max_length": MODEL_MAX_LEN})
     model.to(f"cuda:{local_rank}")
-    # model = DistributedDataParallel(
-    #     model,
-    #     device_ids=[torch.cuda.current_device()],
-    #     find_unused_parameters=False,
-    # )
     configs = build_dataset_configs(N_DATA_SRC)
-    ds_dict, n_samples = load_and_cache_datasets(
+    train_ds, other_ds, n_samples = load_and_cache_datasets(
         configs, 
         CACHE_DIR, 
         NROWS, 
@@ -115,84 +124,12 @@ def main(local_rank, rank):
         test_frac=TEST_FRAC
     )
 
-    train_ds = {n: s["train"]      for n, s in ds_dict.items()}
-    val_ds   = {n: s["validation"] for n, s in ds_dict.items()}
-    test_ds = {n: s["test"] for n, s in ds_dict.items()}
-
-    print(train_ds)
+    # train_ds = {n: s["train"]      for n, s in ds_dict.items()}
+    val_ds   = {n: s["validation"] for n, s in other_ds.items()}
+    test_ds = {n: s["test"] for n, s in other_ds.items()}
 
     if distributed.is_main_process():
-        train_points_info = {}
-        val_points_info = {}
-        test_points_info = {}
-        
-        total_train_count = 0
-        total_val_count = 0
-        total_test_count = 0
-
-        for name, splits_data in ds_dict.items():
-            # Train
-            if isinstance(splits_data["train"], IterableDataset):
-                if NROWS is not None and NROWS > 0: # If NROWS was set for the source stream
-                    # Estimate based on fractions, assuming NROWS was total before split
-                    val_s = int(NROWS * VAL_FRAC)
-                    test_s = int(NROWS * TEST_FRAC)
-                    train_s = NROWS - val_s - test_s
-                    train_points_info[name] = f"~{train_s} (streaming from NROWS={NROWS})"
-                    total_train_count += train_s
-                else:
-                    train_points_info[name] = "Unknown (streaming)"
-            else: # datasets.Dataset
-                count = len(splits_data["train"])
-                train_points_info[name] = count
-                total_train_count += count
-
-            # Validation - these are materialized by prepare_evaluators, but we use the split output here for reporting
-            if isinstance(splits_data["validation"], IterableDataset):
-                # Size depends on how split_iterable_dataset derived it
-                num_val_s = "Unknown (streaming eval)"
-                if NROWS is not None and NROWS > 0:
-                    val_s_count = int(NROWS * VAL_FRAC)
-                    num_val_s = f"~{val_s_count} (streaming from NROWS={NROWS})"
-                    total_val_count += val_s_count
-                elif VAL_FRAC > 0 : # Fallback fixed N from split_iterable_dataset
-                    val_s_count = min(1000, int(0.05 * 20000))
-                    num_val_s = f"~{val_s_count} (streaming fixed N)"
-                    total_val_count += val_s_count
-                else:
-                    num_val_s = "0 (streaming)"
-                val_points_info[name] = num_val_s
-            else: # datasets.Dataset
-                count = len(splits_data["validation"])
-                val_points_info[name] = count
-                total_val_count += count
-
-            # Test
-            if isinstance(splits_data["test"], IterableDataset):
-                num_test_s = "Unknown (streaming eval)"
-                if NROWS is not None and NROWS > 0:
-                    test_s_count = int(NROWS * TEST_FRAC)
-                    num_test_s = f"~{test_s_count} (streaming from NROWS={NROWS})"
-                    total_test_count += test_s_count
-                elif TEST_FRAC > 0: # Fallback fixed N
-                    test_s_count = min(1000, int(0.05 * 20000))
-                    num_test_s = f"~{test_s_count} (streaming fixed N)"
-                    total_test_count += test_s_count
-                else:
-                    num_test_s = "0 (streaming)"
-                test_points_info[name] = num_test_s
-            else: # datasets.Dataset
-                count = len(splits_data["test"])
-                test_points_info[name] = count
-                total_test_count += count
-
-        wandb_config["train_data_points_info"] = train_points_info
-        wandb_config["val_data_points_info"]   = val_points_info
-        wandb_config["test_data_points_info"]  = test_points_info
-        wandb_config["total_train_points_approx"] = total_train_count
-        wandb_config["total_val_points_approx"]   = total_val_count
-        wandb_config["total_test_points_approx"]  = total_test_count
-        wandb_config["total_datapoints_approx"] = total_train_count + total_val_count + total_test_count
+        wandb_config["dataset_src_sizes"] = n_samples
         wandb.config.update(wandb_config, allow_val_change=True)
 
 
@@ -219,7 +156,7 @@ def main(local_rank, rank):
         warmup_ratio=WARMUP_RATIO,
         fp16=not bf16_supported and fp16_supported,
         bf16=bf16_supported,
-        batch_sampler=BatchSamplers.NO_DUPLICATES,
+        # batch_sampler=BatchSamplers.NO_DUPLICATES,
         eval_strategy=eval_strategy,
         eval_steps=EVAL_AND_SAVE_STEPS,
         save_strategy="steps",
@@ -231,8 +168,10 @@ def main(local_rank, rank):
         lr_scheduler_type="cosine",
         report_to="wandb",
         local_rank=local_rank,
+        max_steps = compute_max_steps(n_samples),
+        accelerator_config={'dispatch_batches': False},
+        # split_batches=True,
     )
-
     
 
     trainer = SentenceTransformerTrainer(
@@ -240,7 +179,8 @@ def main(local_rank, rank):
         args=args,
         train_dataset=train_ds,
         eval_dataset=None,
-        loss={n: cfg["loss"](model) for n, cfg in configs.items()},
+        # loss={n: cfg["loss"](model) for n, cfg in configs.items()},
+        loss = MultipleNegativesRankingLoss(model),
         evaluator=val_evaluator,
     )
 
