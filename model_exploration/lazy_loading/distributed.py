@@ -1,6 +1,9 @@
+import functools
+import itertools
 import os
 import random
 from datetime import timedelta
+from typing import Any, Dict, Optional
 
 import numpy as np
 import torch
@@ -8,13 +11,8 @@ import torch.backends.cudnn as cudnn
 import torch.distributed as dist
 from torch.distributed import checkpoint as dist_checkpoint
 from torch.distributed import fsdp
-
-import functools
-import itertools
-
-from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data import Dataset
-from typing import Any, Dict, Optional
+from torch.utils.data.distributed import DistributedSampler
 
 # from utils.schemas import TrainState
 
@@ -187,7 +185,7 @@ def save_model_singular(model, save_path, parallelism, *args, **kwargs):
             dist.barrier()
         case _:
             raise ValueError(
-                f'`parallelism` should be one of "ddp" and "fsdp". Got {parallelism}.'
+                f'`parallelism` should be one of "ddp" and "fsdp". Got {parallelism}.',
             )
 
 

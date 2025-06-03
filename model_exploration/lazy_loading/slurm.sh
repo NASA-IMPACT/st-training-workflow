@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-#SBATCH --mail-user=sa0812@uah.edu 
+#SBATCH --mail-user=sa0812@uah.edu
 #SBATCH --job-name=llm_slurm_conda       # Job name
 #SBATCH --nodes=1                        # Number of nodes
 #SBATCH --gres=gpu:a100:2                # Request 2 GPUs (A100)
@@ -18,7 +18,7 @@ export OMP_NUM_THREADS=1
 
 export MASTER_ADDR=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
 export MASTER_PORT=$(( RANDOM % (50000 - 30000 + 1 ) + 30000 ))
-      
+
 
 echo "===== SLURM ENVIRONMENT ====="
 scontrol show hostnames $SLURM_JOB_NODELIST

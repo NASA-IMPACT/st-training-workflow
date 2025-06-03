@@ -1,7 +1,9 @@
 import os
-from datasets import load_from_disk, DatasetDict
-from transformers import AutoTokenizer
+
 import torch.distributed as dist
+from datasets import DatasetDict, load_from_disk
+from transformers import AutoTokenizer
+
 
 def prepare_pre_tokenized_datasets(
     ds_dict: dict[str, DatasetDict],
@@ -16,12 +18,12 @@ def prepare_pre_tokenized_datasets(
     and returns three dicts mapping name->datasets.Dataset (train/val/test).
     """
     is_ddp = dist.is_available() and dist.is_initialized()
-    rank   = dist.get_rank() if is_ddp else 0
+    rank = dist.get_rank() if is_ddp else 0
 
     tokenizer = AutoTokenizer.from_pretrained(
         model_name,
         model_max_length=max_len,
-        truncation=True
+        truncation=True,
     )
 
     train_ds, val_ds, test_ds = {}, {}, {}
@@ -39,17 +41,33 @@ def prepare_pre_tokenized_datasets(
         else:
             if rank == 0:
                 tok_splits = DatasetDict()
+
                 def tok_fn(ex):
                     out = {}
-                    a = tokenizer(ex["anchor"],  max_length=max_len, padding="max_length", truncation=True)
-                    p = tokenizer(ex["positive"], max_length=max_len, padding="max_length", truncation=True)
-                    out["anchor_input_ids"]      = a["input_ids"]
+                    a = tokenizer(
+                        ex["anchor"],
+                        max_length=max_len,
+                        padding="max_length",
+                        truncation=True,
+                    )
+                    p = tokenizer(
+                        ex["positive"],
+                        max_length=max_len,
+                        padding="max_length",
+                        truncation=True,
+                    )
+                    out["anchor_input_ids"] = a["input_ids"]
                     out["anchor_attention_mask"] = a["attention_mask"]
-                    out["positive_input_ids"]      = p["input_ids"]
+                    out["positive_input_ids"] = p["input_ids"]
                     out["positive_attention_mask"] = p["attention_mask"]
                     if "negative" in ex:
-                        n = tokenizer(ex["negative"], max_length=max_len, padding="max_length", truncation=True)
-                        out["negative_input_ids"]      = n["input_ids"]
+                        n = tokenizer(
+                            ex["negative"],
+                            max_length=max_len,
+                            padding="max_length",
+                            truncation=True,
+                        )
+                        out["negative_input_ids"] = n["input_ids"]
                         out["negative_attention_mask"] = n["attention_mask"]
                     return out
 

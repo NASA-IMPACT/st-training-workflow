@@ -1,37 +1,60 @@
-import os
 import argparse
 import datetime
+import os
 import random
 from typing import Union
+
+import torch
+import wandb
 from datasets import (
-    load_dataset,
-    load_from_disk,
     Dataset,
     DatasetDict,
     concatenate_datasets,
     get_dataset_config_names,
+    load_dataset,
+    load_from_disk,
 )
-import wandb
-import torch
-from sentence_transformers import SentenceTransformer, SentenceTransformerTrainer
-from sentence_transformers.losses import MultipleNegativesRankingLoss
-from sentence_transformers.training_args import SentenceTransformerTrainingArguments, BatchSamplers
-from sentence_transformers.evaluation import InformationRetrievalEvaluator, TripletEvaluator, SequentialEvaluator
 from dotenv import load_dotenv
+from sentence_transformers import SentenceTransformer, SentenceTransformerTrainer
+from sentence_transformers.evaluation import (
+    InformationRetrievalEvaluator,
+    SequentialEvaluator,
+    TripletEvaluator,
+)
+from sentence_transformers.losses import MultipleNegativesRankingLoss
+from sentence_transformers.training_args import (
+    BatchSamplers,
+    SentenceTransformerTrainingArguments,
+)
+from utils import (
+    build_dataset_configs,
+    get_gpu_info,
+    load_and_cache_datasets,
+    prepare_evaluators,
+)
 
-from utils import build_dataset_configs, load_and_cache_datasets, prepare_evaluators, get_gpu_info
 # ──────────────── Constants ────────────────
 
 parser = argparse.ArgumentParser(description="Sentence Transformer Training Config")
 
 parser.add_argument("--nrows", type=int, default=None)
-parser.add_argument("--n_data_src", type=int, default=None, help="number of data sources to use for training")
+parser.add_argument(
+    "--n_data_src",
+    type=int,
+    default=None,
+    help="number of data sources to use for training",
+)
 parser.add_argument("--val_frac", type=float, default=0.05)
 parser.add_argument("--test_frac", type=float, default=0.05)
 parser.add_argument("--model_max_len", type=int, default=1024)
 parser.add_argument("--model_name", type=str, default="nasa-impact/indus-sde-v0.2")
 parser.add_argument("--output_base", type=str, default="tmp_models")
-parser.add_argument("--wb_mode", type=str, default="online", choices=["online", "offline", "disabled"])
+parser.add_argument(
+    "--wb_mode",
+    type=str,
+    default="online",
+    choices=["online", "offline", "disabled"],
+)
 parser.add_argument("--resume_checkpoint_path", type=str, default=None)
 parser.add_argument("--resume_run_id", type=str, default=None)
 parser.add_argument("--num_train_epochs", type=int, default=1)
@@ -43,16 +66,15 @@ parser.add_argument("--gradient_accumulation_steps", type=int, default=8)
 parser.add_argument("--lr", type=float, default=1e-5)
 
 
-
 args = parser.parse_args()
 
-NROWS      = args.nrows
-VAL_FRAC   = args.val_frac
-TEST_FRAC  = args.test_frac
+NROWS = args.nrows
+VAL_FRAC = args.val_frac
+TEST_FRAC = args.test_frac
 MODEL_MAX_LEN = args.model_max_len
 MODEL_NAME = args.model_name
-OUTPUT_BASE= args.output_base
-WB_MODE    = args.wb_mode
+OUTPUT_BASE = args.output_base
+WB_MODE = args.wb_mode
 RESUME_CHECKPOINT_PATH = args.resume_checkpoint_path
 RESUME_RUN_ID = args.resume_run_id
 NUM_TRAIN_EPOCHS = args.num_train_epochs
@@ -93,7 +115,7 @@ wandb_config = {
     "batch_size": BATCH_SIZE,
     "warmup_ratio": WARMUP_RATIO,
     "eval_and_save_steps": EVAL_AND_SAVE_STEPS,
-    "max_datapoints_per_src_for_eval": MAX_DATAPOINTS_PER_SRC_FOR_EVAL
+    "max_datapoints_per_src_for_eval": MAX_DATAPOINTS_PER_SRC_FOR_EVAL,
 }
 bf16_supported = torch.cuda.is_bf16_supported()
 fp16_supported = torch.cuda.is_available()
@@ -101,25 +123,39 @@ fp16_supported = torch.cuda.is_available()
 
 # ──────────────── Main ────────────────
 def main():
-    model   = SentenceTransformer(MODEL_NAME, tokenizer_kwargs={"model_max_length": MODEL_MAX_LEN})
+    model = SentenceTransformer(
+        MODEL_NAME,
+        tokenizer_kwargs={"model_max_length": MODEL_MAX_LEN},
+    )
     configs = build_dataset_configs(N_DATA_SRC)
     ds_dict = load_and_cache_datasets(configs, CACHE_DIR, NROWS)
 
-    train_ds = {n: s["train"]      for n, s in ds_dict.items()}
-    val_ds   = {n: s["validation"] for n, s in ds_dict.items()}
+    train_ds = {n: s["train"] for n, s in ds_dict.items()}
+    val_ds = {n: s["validation"] for n, s in ds_dict.items()}
     test_ds = {n: s["test"] for n, s in ds_dict.items()}
 
-    total_rows = sum(d.num_rows for d in train_ds.values()) + sum(d.num_rows for d in val_ds.values()) + sum(d.num_rows for d in test_ds.values())
+    total_rows = (
+        sum(d.num_rows for d in train_ds.values())
+        + sum(d.num_rows for d in val_ds.values())
+        + sum(d.num_rows for d in test_ds.values())
+    )
     wandb_config["train_data_points"] = sum(d.num_rows for d in train_ds.values())
-    wandb_config["val_data_points"]   = sum(d.num_rows for d in val_ds.values())
-    wandb_config["test_data_points"]  = sum(d.num_rows for d in test_ds.values())
+    wandb_config["val_data_points"] = sum(d.num_rows for d in val_ds.values())
+    wandb_config["test_data_points"] = sum(d.num_rows for d in test_ds.values())
     wandb_config["total_datapoints"] = total_rows
     wandb.config.update(wandb_config)
 
     if RESUME_CHECKPOINT_PATH is not None:
         output_dir = "/".join(RESUME_CHECKPOINT_PATH.split("/")[:-2])
     else:
-        output_dir = str(os.path.join(OUTPUT_BASE, f"nrows_{NROWS}__nsrc_{N_DATA_SRC}", f"timestamp_{formatted_datetime}" ,MODEL_NAME.split("/")[-1]))
+        output_dir = str(
+            os.path.join(
+                OUTPUT_BASE,
+                f"nrows_{NROWS}__nsrc_{N_DATA_SRC}",
+                f"timestamp_{formatted_datetime}",
+                MODEL_NAME.split("/")[-1],
+            ),
+        )
     os.makedirs(output_dir, exist_ok=True)
 
     print(f"Total rows: {total_rows}")
@@ -146,18 +182,24 @@ def main():
     )
 
     if MAX_DATAPOINTS_PER_SRC_FOR_EVAL:
-        val_subset = {k:v.select(range(min(MAX_DATAPOINTS_PER_SRC_FOR_EVAL, len(v)))) for k,v in val_ds.items()}
+        val_subset = {
+            k: v.select(range(min(MAX_DATAPOINTS_PER_SRC_FOR_EVAL, len(v))))
+            for k, v in val_ds.items()
+        }
     else:
         val_subset = val_ds
 
-    val_evaluator = prepare_evaluators(val_ds, max_per_split=MAX_DATAPOINTS_PER_SRC_FOR_EVAL)
+    val_evaluator = prepare_evaluators(
+        val_ds,
+        max_per_split=MAX_DATAPOINTS_PER_SRC_FOR_EVAL,
+    )
     trainer = SentenceTransformerTrainer(
         model=model,
         args=args,
         train_dataset=train_ds,
         eval_dataset=val_subset,
         loss={n: cfg["loss"](model) for n, cfg in configs.items()},
-        evaluator=val_evaluator
+        evaluator=val_evaluator,
     )
 
     if RESUME_CHECKPOINT_PATH is not None:

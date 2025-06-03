@@ -1,46 +1,70 @@
-import os
-import time
 import argparse
 import datetime
+import math
+import os
 import random
-from typing import Union, Dict
+import time
+from typing import Dict, Union
+
+import distributed
+import torch
+import wandb
 from datasets import (
-    load_dataset,
-    load_from_disk,
     Dataset,
     DatasetDict,
     concatenate_datasets,
     get_dataset_config_names,
+    load_dataset,
+    load_from_disk,
 )
-import wandb
-import torch
-from sentence_transformers import SentenceTransformer, SentenceTransformerTrainer
-from sentence_transformers.losses import MultipleNegativesRankingLoss
-from sentence_transformers.training_args import SentenceTransformerTrainingArguments, BatchSamplers, MultiDatasetBatchSamplers
-from sentence_transformers.evaluation import InformationRetrievalEvaluator, TripletEvaluator, SequentialEvaluator
-from dotenv import load_dotenv
-import distributed
 from distributed import init_ddp, print0
-from torch.nn.parallel import DistributedDataParallel
+from dotenv import load_dotenv
 from pretokenize import prepare_pre_tokenized_datasets
-from utils import build_dataset_configs, load_and_cache_datasets, prepare_evaluators, get_gpu_info, PreTokenizedCollator
-
-import math
+from sentence_transformers import SentenceTransformer, SentenceTransformerTrainer
+from sentence_transformers.evaluation import (
+    InformationRetrievalEvaluator,
+    SequentialEvaluator,
+    TripletEvaluator,
+)
+from sentence_transformers.losses import MultipleNegativesRankingLoss
+from sentence_transformers.training_args import (
+    BatchSamplers,
+    MultiDatasetBatchSamplers,
+    SentenceTransformerTrainingArguments,
+)
+from torch.nn.parallel import DistributedDataParallel
 from torch.optim.lr_scheduler import LambdaLR
-from transformers.optimization import get_scheduler # For fallback in custom trainer
+from transformers.optimization import get_scheduler  # For fallback in custom trainer
+from utils import (
+    PreTokenizedCollator,
+    build_dataset_configs,
+    get_gpu_info,
+    load_and_cache_datasets,
+    prepare_evaluators,
+)
 
 # ──────────────── Constants ────────────────
 
 parser = argparse.ArgumentParser(description="Sentence Transformer Training Config")
 
 parser.add_argument("--nrows", type=int, default=None)
-parser.add_argument("--n_data_src", type=int, default=None, help="number of data sources to use for training")
+parser.add_argument(
+    "--n_data_src",
+    type=int,
+    default=None,
+    help="number of data sources to use for training",
+)
 parser.add_argument("--val_frac", type=float, default=0.05)
 parser.add_argument("--test_frac", type=float, default=0.05)
 parser.add_argument("--model_max_len", type=int, default=1024)
 parser.add_argument("--model_name", type=str, default="nasa-impact/indus-sde-v0.2")
 parser.add_argument("--output_base", type=str, default="tmp_models")
-parser.add_argument("--wb_mode", type=str, default="online", choices=["online", "offline", "disabled"])
+parser.add_argument(
+    "--wb_mode",
+    type=str,
+    default="online",
+    choices=["online", "offline", "disabled"],
+)
 parser.add_argument("--resume_checkpoint_path", type=str, default=None)
 parser.add_argument("--resume_run_id", type=str, default=None)
 parser.add_argument("--num_train_epochs", type=int, default=1)
@@ -50,29 +74,62 @@ parser.add_argument("--eval_and_save_steps", type=int, default=1000)
 parser.add_argument("--max_datapoints_per_src_for_eval", type=int, default=20)
 parser.add_argument("--gradient_accumulation_steps", type=int, default=8)
 parser.add_argument("--lr", type=float, default=2e-5)
-parser.add_argument("--pretokenize", action="store_true", help="Enable dataset pretokenization.")
-parser.add_argument("--no_pretokenize", dest="pretokenize", action="store_false", help="Disable dataset pretokenization.")
-parser.set_defaults(pretokenize=False) # Or False, depending on your preferred default
+parser.add_argument(
+    "--pretokenize",
+    action="store_true",
+    help="Enable dataset pretokenization.",
+)
+parser.add_argument(
+    "--no_pretokenize",
+    dest="pretokenize",
+    action="store_false",
+    help="Disable dataset pretokenization.",
+)
+parser.set_defaults(pretokenize=False)  # Or False, depending on your preferred default
 
 # New arguments for the custom scheduler
-parser.add_argument("--custom_lr_scheduler", action="store_true", help="Enable the custom cosine decay learning rate scheduler.")
+parser.add_argument(
+    "--custom_lr_scheduler",
+    action="store_true",
+    help="Enable the custom cosine decay learning rate scheduler.",
+)
 parser.set_defaults(custom_lr_scheduler=True)
-parser.add_argument("--lr_min_custom", type=float, default=5e-6, help="Minimum learning rate for the custom scheduler's linear decay.")
-parser.add_argument("--cosine_cycle_steps_custom", type=int, default=8000, help="Number of steps for one cosine cycle in the custom scheduler.")
-parser.add_argument("--cosine_magnitude_fraction_custom", type=float, default=0.1, help="Magnitude of cosine oscillation as a fraction of the current linear LR in the custom scheduler.")
+parser.add_argument(
+    "--lr_min_custom",
+    type=float,
+    default=5e-6,
+    help="Minimum learning rate for the custom scheduler's linear decay.",
+)
+parser.add_argument(
+    "--cosine_cycle_steps_custom",
+    type=int,
+    default=8000,
+    help="Number of steps for one cosine cycle in the custom scheduler.",
+)
+parser.add_argument(
+    "--cosine_magnitude_fraction_custom",
+    type=float,
+    default=0.1,
+    help="Magnitude of cosine oscillation as a fraction of the current linear LR in the custom scheduler.",
+)
 
-parser.add_argument("--lr_scheduler_type", type=str, default="cosine", help="Fallback lr schedular")
+parser.add_argument(
+    "--lr_scheduler_type",
+    type=str,
+    default="cosine",
+    help="Fallback lr schedular",
+)
 
 
 args = parser.parse_args()
 
-NROWS      = args.nrows
-VAL_FRAC   = args.val_frac
-TEST_FRAC  = args.test_frac
+NROWS = args.nrows
+VAL_FRAC = args.val_frac
+TEST_FRAC = args.test_frac
 MODEL_MAX_LEN = args.model_max_len
 MODEL_NAME = args.model_name
-OUTPUT_BASE= args.output_base
-WB_MODE    = args.wb_mode
+OUTPUT_BASE = args.output_base
+WB_MODE = args.wb_mode
 RESUME_CHECKPOINT_PATH = args.resume_checkpoint_path
 RESUME_RUN_ID = args.resume_run_id
 NUM_TRAIN_EPOCHS = args.num_train_epochs
@@ -111,16 +168,18 @@ wandb_config = {
     "eval_and_save_steps": EVAL_AND_SAVE_STEPS,
     "max_datapoints_per_src_for_eval": MAX_DATAPOINTS_PER_SRC_FOR_EVAL,
     "pretokenization": PRETOKENIZE,
-    "lr_max (initial_lr)": LEARNING_RATE
-    }
+    "lr_max (initial_lr)": LEARNING_RATE,
+}
 
 if CUSTOM_LR_SCHEDULER_ENABLED:
-    wandb_config.update({
-        "lr_scheduler_custom_enabled": True,
-        "lr_min_custom": LR_MIN_CUSTOM,
-        "cosine_cycle_steps_custom": COSINE_CYCLE_STEPS_CUSTOM,
-        "cosine_magnitude_fraction_custom": COSINE_MAGNITUDE_FRACTION_CUSTOM,
-    })
+    wandb_config.update(
+        {
+            "lr_scheduler_custom_enabled": True,
+            "lr_min_custom": LR_MIN_CUSTOM,
+            "cosine_cycle_steps_custom": COSINE_CYCLE_STEPS_CUSTOM,
+            "cosine_magnitude_fraction_custom": COSINE_MAGNITUDE_FRACTION_CUSTOM,
+        },
+    )
 
 bf16_supported = torch.cuda.is_bf16_supported()
 fp16_supported = torch.cuda.is_available()
@@ -131,74 +190,101 @@ class CustomSentenceTransformerTrainer(SentenceTransformerTrainer):
         super().__init__(*args_trainer, **kwargs_trainer)
         self.custom_lr_params = custom_lr_params if custom_lr_params is not None else {}
 
-    def create_scheduler(self, num_training_steps: int, optimizer: torch.optim.Optimizer = None):
+    def create_scheduler(
+        self,
+        num_training_steps: int,
+        optimizer: torch.optim.Optimizer = None,
+    ):
         # self.optimizer should have been created by self.create_optimizer() before this call
         # within self.create_optimizer_and_scheduler().
         if optimizer is None:
             optimizer = self.optimizer
-            if optimizer is None: # Should not happen in normal Trainer flow
+            if optimizer is None:  # Should not happen in normal Trainer flow
                 raise ValueError(
                     "Optimizer has not been created yet or not passed to create_scheduler. "
-                    "This typically means create_optimizer() was not called before create_scheduler()."
+                    "This typically means create_optimizer() was not called before create_scheduler().",
                 )
 
-        use_custom_scheduler = self.custom_lr_params.get('enabled_flag', False)
+        use_custom_scheduler = self.custom_lr_params.get("enabled_flag", False)
 
         if use_custom_scheduler:
-            lr_min_custom = self.custom_lr_params['lr_min_custom']
-            cosine_cycle_steps_custom = self.custom_lr_params['cosine_cycle_steps_custom']
-            cosine_magnitude_fraction_custom = self.custom_lr_params['cosine_magnitude_fraction_custom']
+            lr_min_custom = self.custom_lr_params["lr_min_custom"]
+            cosine_cycle_steps_custom = self.custom_lr_params[
+                "cosine_cycle_steps_custom"
+            ]
+            cosine_magnitude_fraction_custom = self.custom_lr_params[
+                "cosine_magnitude_fraction_custom"
+            ]
             # self.args.learning_rate from TrainingArguments is our lr_max
-            optimizer_lr_max = self.args.learning_rate 
+            optimizer_lr_max = self.args.learning_rate
 
             # Ensure optimizer's initial_lr is set for LambdaLR factor calculation
             for group in optimizer.param_groups:
-                group['initial_lr'] = optimizer_lr_max
+                group["initial_lr"] = optimizer_lr_max
 
             def lr_lambda(current_step: int) -> float:
                 num_warmup_steps = self.args.get_warmup_steps(num_training_steps)
-                
+
                 if current_step < num_warmup_steps:
-                    if num_warmup_steps == 0: # Avoid division by zero if no warmup
-                        return 1.0 # Factor is 1, LR is optimizer_lr_max
-                    return float(current_step) / float(num_warmup_steps) # Linear warmup factor
+                    if num_warmup_steps == 0:  # Avoid division by zero if no warmup
+                        return 1.0  # Factor is 1, LR is optimizer_lr_max
+                    return float(current_step) / float(
+                        num_warmup_steps,
+                    )  # Linear warmup factor
                 else:
                     effective_step = current_step - num_warmup_steps
                     total_main_steps = num_training_steps - num_warmup_steps
 
-                    if total_main_steps <= 0: # No steps after warmup
-                        return lr_min_custom / optimizer_lr_max if optimizer_lr_max > 0 else 0.0
+                    if total_main_steps <= 0:  # No steps after warmup
+                        return (
+                            lr_min_custom / optimizer_lr_max
+                            if optimizer_lr_max > 0
+                            else 0.0
+                        )
 
                     # progress_decay: 0 at start of main phase, 1 at end of main phase
-                    if total_main_steps == 1: # Single step in the main scheduling phase
+                    if (
+                        total_main_steps == 1
+                    ):  # Single step in the main scheduling phase
                         progress_decay = 1.0
                     else:
-                        progress_decay = float(effective_step) / float(total_main_steps - 1)
-                    
-                    progress_decay = min(progress_decay, 1.0) # Clamp progress
+                        progress_decay = float(effective_step) / float(
+                            total_main_steps - 1,
+                        )
 
-                    lr_linear_current = optimizer_lr_max * (1.0 - progress_decay) + \
-                                        lr_min_custom * progress_decay
-                    
+                    progress_decay = min(progress_decay, 1.0)  # Clamp progress
+
+                    lr_linear_current = (
+                        optimizer_lr_max * (1.0 - progress_decay)
+                        + lr_min_custom * progress_decay
+                    )
+
                     amplitude = lr_linear_current * cosine_magnitude_fraction_custom
-                    
+
                     cycle_steps = cosine_cycle_steps_custom
-                    cosine_val = 0.0 
+                    cosine_val = 0.0
                     if cycle_steps > 0:
-                        cosine_val = math.cos(2 * math.pi * (effective_step % cycle_steps) / cycle_steps)
-                    
+                        cosine_val = math.cos(
+                            2 * math.pi * (effective_step % cycle_steps) / cycle_steps,
+                        )
+
                     final_lr_val = lr_linear_current + amplitude * cosine_val
-                    final_lr_val = max(0.0, final_lr_val) 
-                    
-                    return final_lr_val / optimizer_lr_max if optimizer_lr_max > 0 else 0.0
-            
+                    final_lr_val = max(0.0, final_lr_val)
+
+                    return (
+                        final_lr_val / optimizer_lr_max if optimizer_lr_max > 0 else 0.0
+                    )
+
             # Create and assign the custom scheduler
             self.lr_scheduler = LambdaLR(optimizer, lr_lambda, last_epoch=-1)
         else:
             # If not using custom scheduler, delegate to the parent class's (transformers.Trainer) method.
             # This method will create the scheduler based on self.args.lr_scheduler_type,
             # assign it to self.lr_scheduler, and return it.
-            self.lr_scheduler = super().create_scheduler(num_training_steps=num_training_steps, optimizer=optimizer)
+            self.lr_scheduler = super().create_scheduler(
+                num_training_steps=num_training_steps,
+                optimizer=optimizer,
+            )
 
         # Always return self.lr_scheduler, as expected by the base class's create_scheduler signature
         # and some potential call paths.
@@ -208,12 +294,12 @@ class CustomSentenceTransformerTrainer(SentenceTransformerTrainer):
 # ──────────────── Main ────────────────
 def main(local_rank, rank):
     global args
-    model   = SentenceTransformer(
-        MODEL_NAME, 
+    model = SentenceTransformer(
+        MODEL_NAME,
         device=f"cuda:{local_rank}",
         tokenizer_kwargs={"model_max_length": MODEL_MAX_LEN, "truncation": True},
         model_kwargs={"torch_dtype": torch.bfloat16 if bf16_supported else None},
-        )
+    )
     configs = build_dataset_configs(N_DATA_SRC)
     ds_dict = load_and_cache_datasets(configs, CACHE_DIR, NROWS, rank)
 
@@ -228,35 +314,45 @@ def main(local_rank, rank):
         )
     else:
         collator = None
-        train_ds = {n: s["train"]      for n, s in ds_dict.items()}
-        val_ds   = {n: s["validation"] for n, s in ds_dict.items()}
+        train_ds = {n: s["train"] for n, s in ds_dict.items()}
+        val_ds = {n: s["validation"] for n, s in ds_dict.items()}
         test_ds = {n: s["test"] for n, s in ds_dict.items()}
 
-
     total_rows = (
-            sum(len(d) for d in train_ds.values())
+        sum(len(d) for d in train_ds.values())
         + sum(len(d) for d in val_ds.values())
         + sum(len(d) for d in test_ds.values())
-        )
-    
+    )
+
     if distributed.is_main_process():
         wandb_config["train_data_points"] = sum(len(d) for d in train_ds.values())
-        wandb_config["val_data_points"]   = sum(len(d) for d in val_ds.values())
-        wandb_config["test_data_points"]  = sum(len(d) for d in test_ds.values())
+        wandb_config["val_data_points"] = sum(len(d) for d in val_ds.values())
+        wandb_config["test_data_points"] = sum(len(d) for d in test_ds.values())
         wandb_config["total_datapoints"] = total_rows
         wandb.config.update(wandb_config, allow_val_change=True)
 
     if RESUME_CHECKPOINT_PATH is not None:
         output_dir = "/".join(RESUME_CHECKPOINT_PATH.split("/")[:-2])
     else:
-        output_dir = str(os.path.join(OUTPUT_BASE, f"nrows_{NROWS}__nsrc_{N_DATA_SRC}", f"timestamp_{formatted_datetime}" ,MODEL_NAME.split("/")[-1]))
+        output_dir = str(
+            os.path.join(
+                OUTPUT_BASE,
+                f"nrows_{NROWS}__nsrc_{N_DATA_SRC}",
+                f"timestamp_{formatted_datetime}",
+                MODEL_NAME.split("/")[-1],
+            ),
+        )
     os.makedirs(output_dir, exist_ok=True)
 
     print(f"RANK:{rank};Total rows: {total_rows}")
 
     if distributed.is_main_process():
         eval_strategy = "steps"
-        val_evaluator = prepare_evaluators({n: s["validation"] for n, s in ds_dict.items()}, max_per_split=MAX_DATAPOINTS_PER_SRC_FOR_EVAL, BATCH_SIZE=BATCH_SIZE)
+        val_evaluator = prepare_evaluators(
+            {n: s["validation"] for n, s in ds_dict.items()},
+            max_per_split=MAX_DATAPOINTS_PER_SRC_FOR_EVAL,
+            BATCH_SIZE=BATCH_SIZE,
+        )
     else:
         eval_strategy = "no"
         val_evaluator = None
@@ -265,8 +361,12 @@ def main(local_rank, rank):
     # If custom scheduler is used, this type is somewhat a placeholder for HF's internal checks,
     # as our create_scheduler override takes precedence. "linear" is a safe default.
     # If custom is not used, this determines the actual scheduler.
-    effective_lr_scheduler_type = "linear" if CUSTOM_LR_SCHEDULER_ENABLED else args.lr_scheduler_type # args.lr_scheduler_type could be "cosine" by default
-    if not CUSTOM_LR_SCHEDULER_ENABLED and args.lr_scheduler_type is None: # Ensure a default if not set and not custom
+    effective_lr_scheduler_type = (
+        "linear" if CUSTOM_LR_SCHEDULER_ENABLED else args.lr_scheduler_type
+    )  # args.lr_scheduler_type could be "cosine" by default
+    if (
+        not CUSTOM_LR_SCHEDULER_ENABLED and args.lr_scheduler_type is None
+    ):  # Ensure a default if not set and not custom
         effective_lr_scheduler_type = "cosine"
 
     args = SentenceTransformerTrainingArguments(
@@ -296,10 +396,10 @@ def main(local_rank, rank):
 
     # Prepare custom_lr_params dictionary to pass to the custom trainer
     custom_lr_params_for_trainer = {
-        'enabled_flag': CUSTOM_LR_SCHEDULER_ENABLED,
-        'lr_min_custom': LR_MIN_CUSTOM,
-        'cosine_cycle_steps_custom': COSINE_CYCLE_STEPS_CUSTOM,
-        'cosine_magnitude_fraction_custom': COSINE_MAGNITUDE_FRACTION_CUSTOM,
+        "enabled_flag": CUSTOM_LR_SCHEDULER_ENABLED,
+        "lr_min_custom": LR_MIN_CUSTOM,
+        "cosine_cycle_steps_custom": COSINE_CYCLE_STEPS_CUSTOM,
+        "cosine_magnitude_fraction_custom": COSINE_MAGNITUDE_FRACTION_CUSTOM,
     }
 
     trainer = CustomSentenceTransformerTrainer(
@@ -310,7 +410,7 @@ def main(local_rank, rank):
         loss={n: cfg["loss"](model) for n, cfg in configs.items()},
         evaluator=val_evaluator,
         data_collator=collator,
-        custom_lr_params=custom_lr_params_for_trainer # Pass our custom params
+        custom_lr_params=custom_lr_params_for_trainer,  # Pass our custom params
     )
 
     if RESUME_CHECKPOINT_PATH is not None:
@@ -322,11 +422,16 @@ def main(local_rank, rank):
 
     print(f"RANK:{rank};Finished training...")
 
-    
     if distributed.is_main_process():
-        test_evaluator = prepare_evaluators({n: s["test"] for n, s in ds_dict.items()}, max_per_split=None, BATCH_SIZE=BATCH_SIZE)
-        model_to_eval = model.module if isinstance(model, DistributedDataParallel) else model
-        model_to_eval.to(f"cuda:{local_rank}") # Keep it on rank 0's GPU
+        test_evaluator = prepare_evaluators(
+            {n: s["test"] for n, s in ds_dict.items()},
+            max_per_split=None,
+            BATCH_SIZE=BATCH_SIZE,
+        )
+        model_to_eval = (
+            model.module if isinstance(model, DistributedDataParallel) else model
+        )
+        model_to_eval.to(f"cuda:{local_rank}")  # Keep it on rank 0's GPU
         print("Started Test Evaluation ...")
         test_results = test_evaluator(model_to_eval)
         wandb.log({f"Test Evaluation": test_results})
@@ -358,12 +463,12 @@ if __name__ == "__main__":
             )
         else:
             wandb.init(
-                project="nasa_st_traning", 
+                project="nasa_st_traning",
                 mode=WB_MODE,
                 # group="ddp_run",
                 # job_type="train",
                 # reinit=False,
-                )
+            )
 
         wandb_config = {**wandb_config, **get_gpu_info()}
 
@@ -382,4 +487,3 @@ if __name__ == "__main__":
         wandb.finish()
 
     torch.distributed.destroy_process_group()
-
