@@ -39,7 +39,7 @@ echo
 echo "===== LOAD CONDA VIA SHELL HOOK ====="
 # Bootstraps conda in a non-interactive shell
 eval "$($HOME/miniconda3/bin/conda shell.bash hook)"
-conda activate slurm-test
+conda activate st
 
 echo
 echo "===== AFTER ACTIVATION ====="
@@ -88,5 +88,5 @@ srun --mem=0 torchrun \
     --rdzv_id="$SLURM_JOB_ID" \
     --rdzv_endpoint="$MASTER_ADDR":"$MASTER_PORT" \
     --rdzv_backend=c10d \
-    st_trainer_ddp_hf.py --batch_size 32 --gradient_accumulation_steps 16 --lr 3.0e-5
+    st_trainer_ddp_hf.py --batch_size 16 --gradient_accumulation_steps 32 --lr 1e-4 --resume_checkpoint_path /rhome/sawale/indus_traning/sentense_transformers/model_exploration/tmp_models/nrows_None__nsrc_None/timestamp_20250505_16-10-36/indus-sde-v0.2/checkpoints/checkpoint-169000 --resume_run_id 9olox5mz
 echo "<<<<<< test python file"
