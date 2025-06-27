@@ -113,7 +113,98 @@ def get_all_data_subset(name: str, path: str, s1: str, s2: str, loss_fn) -> dict
     return out
 
 
-def build_dataset_configs(N_DATA_SRC=None) -> dict:
+def build_dataset_configs_s2(N_DATA_SRC=None) -> dict:
+    """
+    Define all your dataset mappings and losses for stage 2 data.
+    """
+
+    base = {
+        "specter": {
+            "args": {
+                "path": "sentence-transformers/specter",
+                "split": "train",
+                "name": "triplet",
+            },
+            "map_fn": lambda ex: {
+                "anchor": ex["anchor"],
+                "positive": ex["positive"],
+                "negative": ex["negative"],
+            },
+            "loss": MultipleNegativesRankingLoss,
+        },
+        "pubmed": {
+            "args": {"path": "../data_prep/raw/pubmed.py", "split": "train"},
+            "map_fn": lambda ex: {
+                "anchor": ex["MedlineCitation"]["Article"]["ArticleTitle"],
+                "positive": ex["MedlineCitation"]["Article"]["Abstract"][
+                    "AbstractText"
+                ],
+            },
+            "loss": MultipleNegativesRankingLoss,
+        },
+        "arxiv_title_abstract": {
+            "args": {
+                "path": "json",
+                "data_files": "../data_prep/raw/arxiv-metadata-oai-snapshot.json",
+            },
+            "map_fn": lambda ex: {"anchor": ex["title"], "positive": ex["abstract"]},
+            "loss": MultipleNegativesRankingLoss,
+        },
+        "nasa_ads": {
+            "args": {"path": "nasa-impact/nasa_ads_corpus", "data_files": "*.jsonl.gz"},
+            "map_fn": lambda ex: {
+                "anchor": ex["query"],
+                "positive": ex["positives"]["docs"][0],
+            },
+            "loss": MultipleNegativesRankingLoss,
+        },
+        "s2orc_title_abstract": {
+            "args": {
+                "path": "sentence-transformers/s2orc",
+                "split": "train",
+                "name": "title-abstract-pair",
+            },
+            "map_fn": lambda ex: {"anchor": ex["title"], "positive": ex["abstract"]},
+            "loss": MultipleNegativesRankingLoss,
+        },
+        "s2orc_abstract_citation": {
+            "args": {
+                "path": "sentence-transformers/s2orc",
+                "split": "train",
+                "name": "abstract-citation-pair",
+            },
+            "map_fn": lambda ex: {"anchor": ex["abstract"], "positive": ex["citation"]},
+            "loss": MultipleNegativesRankingLoss,
+        },
+        "s2orc_title_citation": {
+            "args": {
+                "path": "sentence-transformers/s2orc",
+                "split": "train",
+                "name": "title-citation-pair",
+            },
+            "map_fn": lambda ex: {"anchor": ex["title"], "positive": ex["citation"]},
+            "loss": MultipleNegativesRankingLoss,
+        },
+        "nasa-sde-st": {
+            "args": {"path": "nasa-impact/nasa-sde-st-corpus"},
+            "map_fn": lambda ex: {"anchor": ex["query"], "positive": ex["context"]},
+            "loss": MultipleNegativesRankingLoss,
+        },
+        # "pmc": {
+        #     "args": {"path": "../data_prep/raw/pmc_open_access.py", "split": "train"},
+        #     "map_fn": lambda ex: {"anchor": ex["MedlineCitation"]["Article"]["Article Title"], "positive": ex["MedlineCitation"]["Article"]["Abstract"]["AbstractText"]},
+        #     "loss": MultipleNegativesRankingLoss,
+        # },
+    }
+
+    if N_DATA_SRC is not None:
+        n_src = min(len(base), N_DATA_SRC)
+        base = {k: v for i, (k, v) in enumerate(base.items()) if i < n_src}
+
+    return base
+
+
+def build_dataset_configs_s1(N_DATA_SRC=None) -> dict:
     """
     Define all your dataset mappings and losses.
     """
@@ -358,9 +449,14 @@ def load_and_cache_datasets(configs: dict, CACHE_DIR, NROWS=None, rank=None) -> 
                     **cfg["args"],
                     split="train[:%d]" % NROWS,
                     trust_remote_code=True,
+                    num_proc=max(1, os.cpu_count() // 2),
                 )
             else:
-                raw = load_dataset(**cfg["args"], trust_remote_code=True)
+                raw = load_dataset(
+                    **cfg["args"],
+                    trust_remote_code=True,
+                    num_proc=max(1, os.cpu_count() // 2),
+                )
             raw = (
                 concatenate_datasets(list(raw.values()))
                 if isinstance(raw, DatasetDict)
@@ -380,6 +476,13 @@ def load_and_cache_datasets(configs: dict, CACHE_DIR, NROWS=None, rank=None) -> 
             splits = split_dataset(mapped)
             os.makedirs(cache_path, exist_ok=True)
             splits.save_to_disk(cache_path)
+
+        # reverseing dataset
+        # reversed_indices = range(len(splits["train"]) - 1, -1, -1)
+        # splits["train"] = splits["train"].select(reversed_indices)
+        splits["train"] = splits[
+            "train"
+        ].shuffle()  # shuffle the train set so you dont have to skip the already train datapoints
 
         out[name] = splits
     return out
@@ -551,9 +654,12 @@ def prepare_evaluators(
                 positive = ex["positive"]
 
                 if not (isinstance(anchor, str) and isinstance(positive, str)):
-                    # print(f"Skipping sample {i} in '{ds_name}': anchor or positive is not a string.") # Optional
+                    print(
+                        f"Skipping sample {i} in '{ds_name}': anchor or positive is not a string.",
+                    )  # Optional
                     continue
 
+                print("*" * 100)
                 # --- Data for IR Evaluator ---
                 query_key = f"{ds_name}_q{i}"
                 corpus_key = f"{ds_name}_c{i}"

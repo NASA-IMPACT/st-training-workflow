@@ -37,7 +37,8 @@ from torch.optim.lr_scheduler import LambdaLR
 from transformers.optimization import get_scheduler  # For fallback in custom trainer
 from utils import (
     PreTokenizedCollator,
-    build_dataset_configs,
+    build_dataset_configs_s1,
+    build_dataset_configs_s2,
     get_gpu_info,
     load_and_cache_datasets,
     prepare_evaluators,
@@ -57,7 +58,7 @@ parser.add_argument(
 parser.add_argument("--val_frac", type=float, default=0.05)
 parser.add_argument("--test_frac", type=float, default=0.05)
 parser.add_argument("--model_max_len", type=int, default=1024)
-parser.add_argument("--model_name", type=str, default="nasa-impact/indus-sde-v0.2")
+parser.add_argument("--model_name", type=str, default="nasa-impact/indus-sde-st-v0.1")
 parser.add_argument("--output_base", type=str, default="tmp_models")
 parser.add_argument(
     "--wb_mode",
@@ -138,7 +139,7 @@ WARMUP_RATIO = args.warmup_ratio
 EVAL_AND_SAVE_STEPS = args.eval_and_save_steps
 MAX_DATAPOINTS_PER_SRC_FOR_EVAL = args.max_datapoints_per_src_for_eval
 N_DATA_SRC = args.n_data_src
-CACHE_DIR = f"../data/stage1_cache/NROWS_{NROWS}"
+CACHE_DIR = f"../data/stage2_cache/NROWS_{NROWS}"
 GRADIENT_ACCUMULATION_STEPS = args.gradient_accumulation_steps
 LEARNING_RATE = args.lr
 PRETOKENIZE = args.pretokenize
@@ -300,7 +301,7 @@ def main(local_rank, rank):
         tokenizer_kwargs={"model_max_length": MODEL_MAX_LEN, "truncation": True},
         model_kwargs={"torch_dtype": torch.bfloat16 if bf16_supported else None},
     )
-    configs = build_dataset_configs(N_DATA_SRC)
+    configs = build_dataset_configs_s2(N_DATA_SRC)
     ds_dict = load_and_cache_datasets(configs, CACHE_DIR, NROWS, rank)
 
     if PRETOKENIZE:
@@ -377,7 +378,7 @@ def main(local_rank, rank):
         warmup_ratio=WARMUP_RATIO,
         fp16=not bf16_supported and fp16_supported,
         bf16=bf16_supported,
-        # batch_sampler=BatchSamplers.NO_DUPLICATES,
+        batch_sampler=BatchSamplers.NO_DUPLICATES,
         # batch_sampler=BatchSamplers.BATCH_SAMPLER,
         # batch_sampler_type=MultiDatasetBatchSamplers.PROPORTIONAL, # TRY THIS
         eval_strategy=eval_strategy,
@@ -391,7 +392,7 @@ def main(local_rank, rank):
         lr_scheduler_type=effective_lr_scheduler_type,
         report_to="wandb",
         local_rank=local_rank,
-        ignore_data_skip=False,
+        ignore_data_skip=True,
     )
 
     # Prepare custom_lr_params dictionary to pass to the custom trainer
