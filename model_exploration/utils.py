@@ -136,7 +136,7 @@ def build_dataset_configs_s2(N_DATA_SRC=None) -> dict:
             "map_fn": lambda ex: {"anchor": ex["query"], "positive": ex["context"]},
             "loss": MultipleNegativesRankingLoss,
         },
-        "pubmed": {
+        "pubmed_v2": {
             "args": {"path": "../data_prep/raw/pubmed.py", "split": "train"},
             "map_fn": process_pubmed,
             "loss": MultipleNegativesRankingLoss,
