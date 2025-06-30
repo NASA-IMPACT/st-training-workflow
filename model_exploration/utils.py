@@ -131,77 +131,82 @@ def build_dataset_configs_s2(N_DATA_SRC=None) -> dict:
         }
 
     base = {
-        # "nasa-sde-st": {
-        #     "args": {"path": "nasa-impact/nasa-sde-st-corpus"},
-        #     "map_fn": lambda ex: {"anchor": ex["query"], "positive": ex["context"]},
-        #     "loss": MultipleNegativesRankingLoss,
-        # },
+        "nasa-sde-st": {
+            "args": {"path": "nasa-impact/nasa-sde-st-corpus"},
+            "map_fn": lambda ex: {"anchor": ex["query"], "positive": ex["context"]},
+            "loss": MultipleNegativesRankingLoss,
+        },
         "pubmed": {
             "args": {"path": "../data_prep/raw/pubmed.py", "split": "train"},
             "map_fn": process_pubmed,
             "loss": MultipleNegativesRankingLoss,
         },
-        # "arxiv_title_abstract": {
-        #     "args": {
-        #         "path": "json",
-        #         "data_files": "../data_prep/raw/arxiv-metadata-oai-snapshot.json",
-        #     },
-        #     "map_fn": lambda ex: {"anchor": ex["title"], "positive": ex["abstract"]},
-        #     "loss": MultipleNegativesRankingLoss,
-        # },
-        # "nasa_ads": {
-        #     "args": {"path": "nasa-impact/nasa_ads_corpus", "data_files": "*.jsonl.gz"},
-        #     "map_fn": lambda ex: {
-        #         "anchor": ex["query"],
-        #         "positive": ex["positives"]["docs"][0],
-        #     },
-        #     "loss": MultipleNegativesRankingLoss,
-        # },
-        # "s2orc_title_abstract": {
-        #     "args": {
-        #         "path": "sentence-transformers/s2orc",
-        #         "split": "train",
-        #         "name": "title-abstract-pair",
-        #     },
-        #     "map_fn": lambda ex: {"anchor": ex["title"], "positive": ex["abstract"]},
-        #     "loss": MultipleNegativesRankingLoss,
-        # },
-        # "s2orc_abstract_citation": {
-        #     "args": {
-        #         "path": "sentence-transformers/s2orc",
-        #         "split": "train",
-        #         "name": "abstract-citation-pair",
-        #     },
-        #     "map_fn": lambda ex: {"anchor": ex["abstract"], "positive": ex["citation"]},
-        #     "loss": MultipleNegativesRankingLoss,
-        # },
-        # "s2orc_title_citation": {
-        #     "args": {
-        #         "path": "sentence-transformers/s2orc",
-        #         "split": "train",
-        #         "name": "title-citation-pair",
-        #     },
-        #     "map_fn": lambda ex: {"anchor": ex["title"], "positive": ex["citation"]},
-        #     "loss": MultipleNegativesRankingLoss,
-        # },
-        # "specter": {
-        #     "args": {
-        #         "path": "sentence-transformers/specter",
-        #         "split": "train",
-        #         "name": "triplet",
-        #     },
-        #     "map_fn": lambda ex: {
-        #         "anchor": ex["anchor"],
-        #         "positive": ex["positive"],
-        #         "negative": ex["negative"],
-        #     },
-        #     "loss": MultipleNegativesRankingLoss,
-        # },
-        # "pmc": {
-        #     "args": {"path": "../data_prep/raw/pmc_open_access.py", "split": "train"},
-        #     "map_fn": lambda ex: {"anchor": ex["MedlineCitation"]["Article"]["Article Title"], "positive": ex["MedlineCitation"]["Article"]["Abstract"]["AbstractText"]},
-        #     "loss": MultipleNegativesRankingLoss,
-        # },
+        "arxiv_title_abstract": {
+            "args": {
+                "path": "json",
+                "data_files": "../data_prep/raw/arxiv-metadata-oai-snapshot.json",
+            },
+            "map_fn": lambda ex: {"anchor": ex["title"], "positive": ex["abstract"]},
+            "loss": MultipleNegativesRankingLoss,
+        },
+        "nasa_ads": {
+            "args": {"path": "nasa-impact/nasa_ads_corpus", "data_files": "*.jsonl.gz"},
+            "map_fn": lambda ex: {
+                "anchor": ex["query"],
+                "positive": ex["positives"]["docs"][0],
+            },
+            "loss": MultipleNegativesRankingLoss,
+        },
+        "s2orc_title_abstract": {
+            "args": {
+                "path": "sentence-transformers/s2orc",
+                "split": "train",
+                "name": "title-abstract-pair",
+            },
+            "map_fn": lambda ex: {"anchor": ex["title"], "positive": ex["abstract"]},
+            "loss": MultipleNegativesRankingLoss,
+        },
+        "s2orc_abstract_citation": {
+            "args": {
+                "path": "sentence-transformers/s2orc",
+                "split": "train",
+                "name": "abstract-citation-pair",
+            },
+            "map_fn": lambda ex: {"anchor": ex["abstract"], "positive": ex["citation"]},
+            "loss": MultipleNegativesRankingLoss,
+        },
+        "s2orc_title_citation": {
+            "args": {
+                "path": "sentence-transformers/s2orc",
+                "split": "train",
+                "name": "title-citation-pair",
+            },
+            "map_fn": lambda ex: {"anchor": ex["title"], "positive": ex["citation"]},
+            "loss": MultipleNegativesRankingLoss,
+        },
+        "specter": {
+            "args": {
+                "path": "sentence-transformers/specter",
+                "split": "train",
+                "name": "triplet",
+            },
+            "map_fn": lambda ex: {
+                "anchor": ex["anchor"],
+                "positive": ex["positive"],
+                "negative": ex["negative"],
+            },
+            "loss": MultipleNegativesRankingLoss,
+        },
+        "pmc": {
+            "args": {"path": "../data_prep/raw/pmc_open_access.py", "split": "train"},
+            "map_fn": lambda ex: {
+                "anchor": ex["MedlineCitation"]["Article"]["Article Title"],
+                "positive": ex["MedlineCitation"]["Article"]["Abstract"][
+                    "AbstractText"
+                ],
+            },
+            "loss": MultipleNegativesRankingLoss,
+        },
     }
 
     if N_DATA_SRC is not None:
