@@ -118,138 +118,85 @@ def build_dataset_configs_s2(N_DATA_SRC=None) -> dict:
     Define all your dataset mappings and losses for stage 2 data.
     """
 
-    def process_pubmed_batch(batch):
-        """
-        Safely processes a batch of PubMed data, handling inconsistent structures
-        and filtering out incomplete data points.
-        """
-        # ====================================================================
-        # 1. EXTRACTION - Same as before
-        # First, extract all potential data points from the raw batch.
-        # ====================================================================
-        initial_anchors = []
-        initial_positives = []
-
-        for item in batch["MedlineCitation"]:
-            citation_dict = None
-
-            # Universal handler for list or dict inconsistency
-            if isinstance(item, list):
-                if item:
-                    citation_dict = item[0]
-            elif isinstance(item, dict):
-                citation_dict = item
-
-            if not citation_dict:
-                initial_anchors.append("")
-                initial_positives.append("")
-                continue
-
-            # Safely extract Title and Abstract
-            title = citation_dict.get("Article", {}).get("ArticleTitle", "")
-            initial_anchors.append(title or "")
-
-            abstract_data = (
-                citation_dict.get("Article", {}).get("Abstract", {}).get("AbstractText")
-            )
-            if isinstance(abstract_data, list):
-                initial_positives.append(" ".join(abstract_data))
-            else:
-                initial_positives.append(abstract_data or "")
-
-        # ====================================================================
-        # 2. FILTERING - The new logic
-        # Now, create the final lists, keeping only pairs where BOTH
-        # anchor and positive have content.
-        # ====================================================================
-        final_anchors = []
-        final_positives = []
-
-        for anchor, positive in zip(initial_anchors, initial_positives):
-            # The condition: if anchor is not empty AND positive is not empty
-            if anchor and positive:
-                final_anchors.append(anchor)
-                final_positives.append(positive)
-
-        # The 'negative' list should correspond to the final, filtered data.
-        final_negatives = [""] * len(final_anchors)
-
-        # ====================================================================
-        # 3. RETURN - Return the clean, filtered batch
-        # ====================================================================
+    def process_pubmed(example):
+        try:
+            title = example["MedlineCitation"]["Article"]["ArticleTitle"]
+            abstract = example["MedlineCitation"]["Article"]["Abstract"]["AbstractText"]
+        except (KeyError, TypeError):
+            title, abstract = "", ""
         return {
-            "anchor": final_anchors,
-            "positive": final_positives,
-            "negative": final_negatives,
+            "anchor": title,
+            "positive": abstract,
+            "negative": "",
         }
 
     base = {
+        # "nasa-sde-st": {
+        #     "args": {"path": "nasa-impact/nasa-sde-st-corpus"},
+        #     "map_fn": lambda ex: {"anchor": ex["query"], "positive": ex["context"]},
+        #     "loss": MultipleNegativesRankingLoss,
+        # },
         "pubmed": {
             "args": {"path": "../data_prep/raw/pubmed.py", "split": "train"},
-            "map_fn": process_pubmed_batch,
+            "map_fn": process_pubmed,
             "loss": MultipleNegativesRankingLoss,
         },
-        "arxiv_title_abstract": {
-            "args": {
-                "path": "json",
-                "data_files": "../data_prep/raw/arxiv-metadata-oai-snapshot.json",
-            },
-            "map_fn": lambda ex: {"anchor": ex["title"], "positive": ex["abstract"]},
-            "loss": MultipleNegativesRankingLoss,
-        },
-        "nasa_ads": {
-            "args": {"path": "nasa-impact/nasa_ads_corpus", "data_files": "*.jsonl.gz"},
-            "map_fn": lambda ex: {
-                "anchor": ex["query"],
-                "positive": ex["positives"]["docs"][0],
-            },
-            "loss": MultipleNegativesRankingLoss,
-        },
-        "nasa-sde-st": {
-            "args": {"path": "nasa-impact/nasa-sde-st-corpus"},
-            "map_fn": lambda ex: {"anchor": ex["query"], "positive": ex["context"]},
-            "loss": MultipleNegativesRankingLoss,
-        },
-        "s2orc_title_abstract": {
-            "args": {
-                "path": "sentence-transformers/s2orc",
-                "split": "train",
-                "name": "title-abstract-pair",
-            },
-            "map_fn": lambda ex: {"anchor": ex["title"], "positive": ex["abstract"]},
-            "loss": MultipleNegativesRankingLoss,
-        },
-        "s2orc_abstract_citation": {
-            "args": {
-                "path": "sentence-transformers/s2orc",
-                "split": "train",
-                "name": "abstract-citation-pair",
-            },
-            "map_fn": lambda ex: {"anchor": ex["abstract"], "positive": ex["citation"]},
-            "loss": MultipleNegativesRankingLoss,
-        },
-        "s2orc_title_citation": {
-            "args": {
-                "path": "sentence-transformers/s2orc",
-                "split": "train",
-                "name": "title-citation-pair",
-            },
-            "map_fn": lambda ex: {"anchor": ex["title"], "positive": ex["citation"]},
-            "loss": MultipleNegativesRankingLoss,
-        },
-        "specter": {
-            "args": {
-                "path": "sentence-transformers/specter",
-                "split": "train",
-                "name": "triplet",
-            },
-            "map_fn": lambda ex: {
-                "anchor": ex["anchor"],
-                "positive": ex["positive"],
-                "negative": ex["negative"],
-            },
-            "loss": MultipleNegativesRankingLoss,
-        },
+        # "arxiv_title_abstract": {
+        #     "args": {
+        #         "path": "json",
+        #         "data_files": "../data_prep/raw/arxiv-metadata-oai-snapshot.json",
+        #     },
+        #     "map_fn": lambda ex: {"anchor": ex["title"], "positive": ex["abstract"]},
+        #     "loss": MultipleNegativesRankingLoss,
+        # },
+        # "nasa_ads": {
+        #     "args": {"path": "nasa-impact/nasa_ads_corpus", "data_files": "*.jsonl.gz"},
+        #     "map_fn": lambda ex: {
+        #         "anchor": ex["query"],
+        #         "positive": ex["positives"]["docs"][0],
+        #     },
+        #     "loss": MultipleNegativesRankingLoss,
+        # },
+        # "s2orc_title_abstract": {
+        #     "args": {
+        #         "path": "sentence-transformers/s2orc",
+        #         "split": "train",
+        #         "name": "title-abstract-pair",
+        #     },
+        #     "map_fn": lambda ex: {"anchor": ex["title"], "positive": ex["abstract"]},
+        #     "loss": MultipleNegativesRankingLoss,
+        # },
+        # "s2orc_abstract_citation": {
+        #     "args": {
+        #         "path": "sentence-transformers/s2orc",
+        #         "split": "train",
+        #         "name": "abstract-citation-pair",
+        #     },
+        #     "map_fn": lambda ex: {"anchor": ex["abstract"], "positive": ex["citation"]},
+        #     "loss": MultipleNegativesRankingLoss,
+        # },
+        # "s2orc_title_citation": {
+        #     "args": {
+        #         "path": "sentence-transformers/s2orc",
+        #         "split": "train",
+        #         "name": "title-citation-pair",
+        #     },
+        #     "map_fn": lambda ex: {"anchor": ex["title"], "positive": ex["citation"]},
+        #     "loss": MultipleNegativesRankingLoss,
+        # },
+        # "specter": {
+        #     "args": {
+        #         "path": "sentence-transformers/specter",
+        #         "split": "train",
+        #         "name": "triplet",
+        #     },
+        #     "map_fn": lambda ex: {
+        #         "anchor": ex["anchor"],
+        #         "positive": ex["positive"],
+        #         "negative": ex["negative"],
+        #     },
+        #     "loss": MultipleNegativesRankingLoss,
+        # },
         # "pmc": {
         #     "args": {"path": "../data_prep/raw/pmc_open_access.py", "split": "train"},
         #     "map_fn": lambda ex: {"anchor": ex["MedlineCitation"]["Article"]["Article Title"], "positive": ex["MedlineCitation"]["Article"]["Abstract"]["AbstractText"]},
@@ -527,6 +474,10 @@ def load_and_cache_datasets(configs: dict, CACHE_DIR, NROWS=None, rank=None) -> 
                 cfg["map_fn"],
                 remove_columns=raw.column_names,
                 num_proc=max(1, os.cpu_count() // 2),
+            )
+            # removed examples with either anchor or positive missing
+            mapped = mapped.filter(
+                lambda example: example["anchor"] and example["positive"],
             )
             cols = ["anchor", "positive"] + (
                 ["negative"] if "negative" in mapped.column_names else []
