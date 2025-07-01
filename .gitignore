@@ -180,3 +180,9 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+
+wandb
+*tmp_models*
+training_output
+.venv*/

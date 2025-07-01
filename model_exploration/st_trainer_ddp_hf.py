@@ -8,15 +8,9 @@ from typing import Dict, Union
 
 import distributed
 import torch
-import wandb
-from datasets import (
-    Dataset,
-    DatasetDict,
-    concatenate_datasets,
-    get_dataset_config_names,
-    load_dataset,
-    load_from_disk,
-)
+from datasets import Dataset, DatasetDict, concatenate_datasets
+from datasets import config as dataset_config
+from datasets import get_dataset_config_names, load_dataset, load_from_disk
 from distributed import init_ddp, print0
 from dotenv import load_dotenv
 from pretokenize import prepare_pre_tokenized_datasets
@@ -43,6 +37,8 @@ from utils import (
     load_and_cache_datasets,
     prepare_evaluators,
 )
+
+import wandb
 
 # ──────────────── Constants ────────────────
 
@@ -184,6 +180,10 @@ if CUSTOM_LR_SCHEDULER_ENABLED:
 
 bf16_supported = torch.cuda.is_bf16_supported()
 fp16_supported = torch.cuda.is_available()
+
+
+# Set dataset config load up to 800gb into the memory for faster training speed
+dataset_config.IN_MEMORY_MAX_SIZE = 800 * (1024**3)
 
 # ──────────────── Custom Trainer Class ────────────────
 class CustomSentenceTransformerTrainer(SentenceTransformerTrainer):
@@ -454,7 +454,8 @@ if __name__ == "__main__":
         if RESUME_RUN_ID is not None:
             assert RESUME_RUN_ID is not None
             wandb.init(
-                project="nasa_st_traning",
+                entity="impact-ibm-collaboration",
+                project="nasa-indus-sde-s2",
                 mode=WB_MODE,
                 id=RESUME_RUN_ID,
                 resume="must",
@@ -464,7 +465,8 @@ if __name__ == "__main__":
             )
         else:
             wandb.init(
-                project="nasa_st_traning",
+                entity="impact-ibm-collaboration",
+                project="nasa-indus-sde-s2",
                 mode=WB_MODE,
                 # group="ddp_run",
                 # job_type="train",

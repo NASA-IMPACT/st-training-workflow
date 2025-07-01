@@ -8,7 +8,6 @@ from typing import Dict, List, Optional, Union
 
 import distributed
 import torch
-import wandb
 from datasets import (
     Dataset,
     DatasetDict,
@@ -38,6 +37,8 @@ from sentence_transformers.training_args import (
 )
 from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
+
+import wandb
 
 
 def get_gpu_info():
@@ -127,7 +128,7 @@ def build_dataset_configs_s2(N_DATA_SRC=None) -> dict:
         return {
             "anchor": title,
             "positive": abstract,
-            "negative": "",
+            # "negative": "",
         }
 
     base = {
@@ -197,16 +198,16 @@ def build_dataset_configs_s2(N_DATA_SRC=None) -> dict:
             },
             "loss": MultipleNegativesRankingLoss,
         },
-        "pmc": {
-            "args": {"path": "../data_prep/raw/pmc_open_access.py", "split": "train"},
-            "map_fn": lambda ex: {
-                "anchor": ex["MedlineCitation"]["Article"]["Article Title"],
-                "positive": ex["MedlineCitation"]["Article"]["Abstract"][
-                    "AbstractText"
-                ],
-            },
-            "loss": MultipleNegativesRankingLoss,
-        },
+        # "pmc": {
+        #     "args": {"path": "../data_prep/raw/pmc_open_access.py", "split": "train"},
+        #     "map_fn": lambda ex: {
+        #         "anchor": ex["MedlineCitation"]["Article"]["Article Title"],
+        #         "positive": ex["MedlineCitation"]["Article"]["Abstract"][
+        #             "AbstractText"
+        #         ],
+        #     },
+        #     "loss": MultipleNegativesRankingLoss,
+        # },
     }
 
     if N_DATA_SRC is not None:
@@ -454,7 +455,7 @@ def load_and_cache_datasets(configs: dict, CACHE_DIR, NROWS=None, rank=None) -> 
         cache_path = os.path.join(CACHE_DIR, name)
 
         if os.path.isdir(cache_path):
-            splits = load_from_disk(cache_path)
+            splits = load_from_disk(cache_path, keep_in_memory=True)
         else:
             if NROWS:
                 raw = load_dataset(
