@@ -2,12 +2,15 @@ import argparse
 import csv  # For CSV writing
 import datetime
 import os
+import pickle
 import random
 import time
 from typing import Dict, List, Optional, Union
 
 import distributed
+import joblib
 import torch
+import wandb
 from datasets import (
     Dataset,
     DatasetDict,
@@ -37,8 +40,7 @@ from sentence_transformers.training_args import (
 )
 from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
-
-import wandb
+from tqdm import tqdm
 
 
 def get_gpu_info():
@@ -137,7 +139,7 @@ def build_dataset_configs_s2(N_DATA_SRC=None) -> dict:
             "map_fn": lambda ex: {"anchor": ex["query"], "positive": ex["context"]},
             "loss": MultipleNegativesRankingLoss,
         },
-        "pubmed_v2": {
+        "pubmed_v3": {
             "args": {"path": "../data_prep/raw/pubmed.py", "split": "train"},
             "map_fn": process_pubmed,
             "loss": MultipleNegativesRankingLoss,
@@ -198,16 +200,16 @@ def build_dataset_configs_s2(N_DATA_SRC=None) -> dict:
             },
             "loss": MultipleNegativesRankingLoss,
         },
-        # "pmc": {
-        #     "args": {"path": "../data_prep/raw/pmc_open_access.py", "split": "train"},
-        #     "map_fn": lambda ex: {
-        #         "anchor": ex["MedlineCitation"]["Article"]["Article Title"],
-        #         "positive": ex["MedlineCitation"]["Article"]["Abstract"][
-        #             "AbstractText"
-        #         ],
-        #     },
-        #     "loss": MultipleNegativesRankingLoss,
-        # },
+        "pmc": {
+            "args": {"path": "../data_prep/raw/pmc_open_access.py", "split": "train"},
+            "map_fn": lambda ex: {
+                "anchor": ex["MedlineCitation"]["Article"]["Article Title"],
+                "positive": ex["MedlineCitation"]["Article"]["Abstract"][
+                    "AbstractText"
+                ],
+            },
+            "loss": MultipleNegativesRankingLoss,
+        },
     }
 
     if N_DATA_SRC is not None:
@@ -622,32 +624,48 @@ def prepare_evaluators(
     eval_ds: dict,
     max_per_split: int = 10,
     BATCH_SIZE: int = 32,
+    cache_dir: str = None,
 ) -> Optional[SequentialEvaluator]:
     """
-    Build IR, Triplet (if applicable), and MNRL evaluators from evaluation datasets,
-    then wrap them in a SequentialEvaluator.
-
+    Prepares a SequentialEvaluator by processing evaluation datasets and creating
+    various evaluators (Information Retrieval, Triplet, and MNRL Loss evaluators).
     Args:
-        eval_ds (dict): Dictionary where keys are dataset names (str) and
-                        values are Hugging Face Dataset objects (or similar iterable)
-                        expected to have columns like "anchor", "positive",
-                        and optionally "negative".
-        max_per_split (int): Maximum number of samples to take from each dataset split.
-                             If 0 or None, use all samples. Defaults to 10.
-        BATCH_SIZE (int): Batch size to use for the evaluators. Defaults to 32.
-
+        eval_ds (dict): A dictionary where keys are dataset names and values are datasets.
+                        Each dataset is expected to have columns like 'anchor', 'positive',
+                        and optionally 'negative'.
+        max_per_split (int, optional): Maximum number of samples to use per dataset split.
+                                        If set to a positive value, datasets will be truncated
+                                        to this size. Defaults to 10.
+        BATCH_SIZE (int, optional): Batch size to use for evaluators. Defaults to 32.
+        cache_dir (str, optional): Directory to cache processed datasets and evaluator data.
+                                   If None, caching is disabled. Defaults to None.
     Returns:
-        Optional[SequentialEvaluator]: An evaluator combining IR, Triplet (if data exists),
-                                       and MNRL evaluators, or None if no evaluators
-                                       could be created.
+        Optional[SequentialEvaluator]: A SequentialEvaluator containing the created evaluators.
+                                       Returns None if no evaluators were successfully created.
+    Raises:
+        Exception: Propagates exceptions encountered during dataset processing or evaluator creation.
+    Notes:
+        - The function processes datasets to prepare data for different types of evaluators:
+          Information Retrieval (IR), Triplet, and MNRL Loss evaluators.
+        - Processed data is cached to avoid redundant computations.
+        - If a dataset lacks required columns ('anchor' and 'positive'), it is skipped.
+        - Evaluators are created only if sufficient data is available for their respective types.
+        - The function uses multiprocessing for dataset mapping to improve performance.
+        - If no evaluators are created, a warning is printed, and the function returns None.
     """
+
     if max_per_split and max_per_split > 0:
         # Assume eval_ds.items() and v.select() work, or let errors propagate
         ds_dict = {
             k: v.select(range(min(max_per_split, len(v)))) for k, v in eval_ds.items()
         }
+
+        cache_dir = os.path.join(cache_dir, f"max_per_split_{max_per_split}")
     else:
+        cache_dir = os.path.join(cache_dir, "max_per_split_None")
         ds_dict = eval_ds
+
+    os.makedirs(cache_dir, exist_ok=True)
 
     evaluators = []
     all_ir_queries, all_ir_corpus, all_ir_rel_docs = {}, {}, {}
@@ -656,52 +674,75 @@ def prepare_evaluators(
 
     # --- Process datasets ---
     for ds_name, ds in ds_dict.items():
-        try:  # Add basic try-except around processing each dataset source
-            column_names = ds.column_names
-            has_negatives = "negative" in column_names
-            has_anchor = "anchor" in column_names
-            has_positive = "positive" in column_names
+        print("Transforming dataset source for Evaluation:", ds_name)
+        ds_cache_path = os.path.join(cache_dir, f"{ds_name}.pkl")
 
-            if not (has_anchor and has_positive):
-                print(f"Skipping dataset '{ds_name}': missing 'anchor' or 'positive'.")
-                continue
+        if not os.path.isfile(ds_cache_path):
+            processed_data = {}
+            try:  # Add basic try-except around processing each dataset source
+                column_names = ds.column_names
+                has_negatives = "negative" in column_names
+                has_anchor = "anchor" in column_names
+                has_positive = "positive" in column_names
 
-            for i, ex in enumerate(ds):
-                anchor = ex["anchor"]
-                positive = ex["positive"]
-
-                if not (isinstance(anchor, str) and isinstance(positive, str)):
+                if not (has_anchor and has_positive):
                     print(
-                        f"Skipping sample {i} in '{ds_name}': anchor or positive is not a string.",
-                    )  # Optional
+                        f"Skipping dataset '{ds_name}': missing 'anchor' or 'positive'.",
+                    )
                     continue
 
-                print("*" * 100)
+                def add_ids(example, idx):
+                    """A function to add qid and cid based on the index."""
+                    return {
+                        "qid": f"{ds_name}_q_{idx}",
+                        "cid": f"{ds_name}_c_{idx}",
+                    }
+
                 # --- Data for IR Evaluator ---
-                query_key = f"{ds_name}_q{i}"
-                corpus_key = f"{ds_name}_c{i}"
-                all_ir_queries[query_key] = anchor
-                all_ir_corpus[corpus_key] = positive
-                # Ensure rel_docs handles multiple relevant docs per query if needed (current setup 1:1)
-                if query_key not in all_ir_rel_docs:
-                    all_ir_rel_docs[query_key] = set()
-                all_ir_rel_docs[query_key].add(corpus_key)
+                ds = ds.map(
+                    add_ids,
+                    with_indices=True,
+                    num_proc=os.cpu_count() // 2,
+                )  # Use multiprocessing for map
+                processed_data["all_ir_queries"] = dict(zip(ds["qid"], ds["anchor"]))
+                processed_data["all_ir_corpus"] = dict(zip(ds["cid"], ds["positive"]))
+                dx = ds.to_pandas()
+                positive_to_cids_map = dx.groupby("positive")["cid"].apply(set)
+                relevant_sets = dx["positive"].map(positive_to_cids_map)
+                processed_data["all_ir_rel_docs"] = dict(zip(dx["qid"], relevant_sets))
 
                 # --- Data for Triplet Evaluator ---
                 if has_negatives:
-                    negative = ex.get("negative")
-                    if isinstance(negative, str):
-                        all_triplet_anchors.append(anchor)
-                        all_triplet_positives.append(positive)
-                        all_triplet_negatives.append(negative)
+                    # Extend lists with entire columns at once
+                    processed_data["all_triplet_anchors"] = ds["anchor"]
+                    processed_data["all_triplet_positives"] = ds["positive"]
+                    processed_data["all_triplet_negatives"] = ds["negative"]
 
                 # --- Data for MNRL Evaluator (as InputExample) ---
-                all_mnrl_samples.append(InputExample(texts=[anchor, positive]))
-        except Exception as e:
-            print(
-                f"Error processing dataset source '{ds_name}': {type(e).__name__}: {e}. Skipping this source.",
-            )
-            continue  # Continue to next dataset if one fails
+                processed_data["all_mnrl_samples"] = [
+                    InputExample(texts=[anchor, positive])
+                    for anchor, positive in zip(ds["anchor"], ds["positive"])
+                ]
+
+                joblib.dump(processed_data, ds_cache_path)
+
+            except Exception as e:
+                print(
+                    f"Error processing dataset source '{ds_name}': {type(e).__name__}: {e}. Skipping this source.",
+                )
+                continue  # Continue to next dataset if one fails
+
+        else:
+            processed_data = joblib.load(ds_cache_path)
+
+        # assign the variables from processed_data
+        all_ir_queries.update(processed_data.get("all_ir_queries", {}))
+        all_ir_corpus.update(processed_data.get("all_ir_corpus", {}))
+        all_ir_rel_docs.update(processed_data.get("all_ir_rel_docs", {}))
+        all_triplet_anchors.extend(processed_data.get("all_triplet_anchors", []))
+        all_triplet_positives.extend(processed_data.get("all_triplet_positives", []))
+        all_triplet_negatives.extend(processed_data.get("all_triplet_negatives", []))
+        all_mnrl_samples.extend(processed_data.get("all_mnrl_samples", []))
 
     # --- Create Information Retrieval Evaluator ---
     if all_ir_queries and all_ir_corpus and all_ir_rel_docs:
