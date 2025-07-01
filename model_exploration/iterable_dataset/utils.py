@@ -374,21 +374,21 @@ def build_dataset_configs_s2(N_DATA_SRC=None) -> dict:
         }
 
     base = {
-        "specter": {
-            "args": {
-                "path": "sentence-transformers/specter",
-                "split": "train",
-                "name": "triplet",
-            },
-            "map_fn": lambda ex: {
-                "anchor": ex["anchor"],
-                "positive": ex["positive"],
-                "negative": ex["negative"],
-            },
-            "cols": col_union,
-            "loss": MultipleNegativesRankingLoss,
-            "total_nrows": 684_000,  # Approximate number of triplets
-        },
+        # "specter": {
+        #     "args": {
+        #         "path": "sentence-transformers/specter",
+        #         "split": "train",
+        #         "name": "triplet",
+        #     },
+        #     "map_fn": lambda ex: {
+        #         "anchor": ex["anchor"],
+        #         "positive": ex["positive"],
+        #         "negative": ex["negative"],
+        #     },
+        #     "cols": col_union,
+        #     "loss": MultipleNegativesRankingLoss,
+        #     "total_nrows": 684_000,  # Approximate number of triplets
+        # },
         "pubmed": {
             "args": {"path": "../../data_prep/raw/pubmed.py", "split": "train"},
             "map_fn": process_pubmed_batch,
@@ -396,87 +396,87 @@ def build_dataset_configs_s2(N_DATA_SRC=None) -> dict:
             "loss": MultipleNegativesRankingLoss,
             "total_nrows": 24_000_000,  # Approximate number of triplets
         },
-        "arxiv_title_abstract": {
-            "args": {
-                "path": "json",
-                "data_files": "../../data_prep/raw/arxiv-metadata-oai-snapshot.json",
-            },
-            "map_fn": lambda ex: {
-                "anchor": ex["title"],
-                "positive": ex["abstract"],
-                "negative": [""] * len(ex["title"]),
-            },
-            "cols": col_union,
-            "loss": MultipleNegativesRankingLoss,
-            "total_nrows": 2_700_000,
-        },
-        "nasa_ads": {
-            "args": {"path": "nasa-impact/nasa_ads_corpus", "data_files": "*.jsonl.gz"},
-            "map_fn": lambda ex: {
-                "anchor": ex["query"],
-                "positive": ex["positives"]["docs"][0],
-                "negative": [""] * len(ex["query"]),
-            },
-            "cols": col_union,
-            "loss": MultipleNegativesRankingLoss,
-            "total_nrows": 2_660_000,  # Approximate number of triplets
-        },
-        "s2orc_title_abstract": {
-            "args": {
-                "path": "sentence-transformers/s2orc",
-                "split": "train",
-                "name": "title-abstract-pair",
-            },
-            "map_fn": lambda ex: {
-                "anchor": ex["title"],
-                "positive": ex["abstract"],
-                "negative": [""] * len(ex["title"]),
-            },
-            "cols": col_union,
-            "loss": MultipleNegativesRankingLoss,
-            "total_nrows": 41_800_000,  # Approximate number of pairs
-        },
-        "s2orc_abstract_citation": {
-            "args": {
-                "path": "sentence-transformers/s2orc",
-                "split": "train",
-                "name": "abstract-citation-pair",
-            },
-            "map_fn": lambda ex: {
-                "anchor": ex["abstract"],
-                "positive": ex["citation"],
-                "negative": [""] * len(ex["abstract"]),
-            },
-            "cols": col_union,
-            "loss": MultipleNegativesRankingLoss,
-            "total_nrows": 39_600_000,  # Approximate number of pairs
-        },
-        "s2orc_title_citation": {
-            "args": {
-                "path": "sentence-transformers/s2orc",
-                "split": "train",
-                "name": "title-citation-pair",
-            },
-            "map_fn": lambda ex: {
-                "anchor": ex["title"],
-                "positive": ex["citation"],
-                "negative": [""] * len(ex["title"]),
-            },
-            "loss": MultipleNegativesRankingLoss,
-            "cols": col_union,
-            "total_nrows": 51_000_000,  # Approximate number of pairs
-        },
-        "nasa-sde-st": {
-            "args": {"path": "nasa-impact/nasa-sde-st-corpus"},
-            "map_fn": lambda ex: {
-                "anchor": ex["query"],
-                "positive": ex["context"],
-                "negative": [""] * len(ex["query"]),
-            },
-            "cols": col_union,
-            "loss": MultipleNegativesRankingLoss,
-            "total_nrows": 1_100_000,  # Approximate number of pairs
-        },
+        # "arxiv_title_abstract": {
+        #     "args": {
+        #         "path": "json",
+        #         "data_files": "../../data_prep/raw/arxiv-metadata-oai-snapshot.json",
+        #     },
+        #     "map_fn": lambda ex: {
+        #         "anchor": ex["title"],
+        #         "positive": ex["abstract"],
+        #         "negative": [""] * len(ex["title"]),
+        #     },
+        #     "cols": col_union,
+        #     "loss": MultipleNegativesRankingLoss,
+        #     "total_nrows": 2_700_000,
+        # },
+        # "nasa_ads": {
+        #     "args": {"path": "nasa-impact/nasa_ads_corpus", "data_files": "*.jsonl.gz"},
+        #     "map_fn": lambda ex: {
+        #         "anchor": ex["query"],
+        #         "positive": ex["positives"]["docs"][0],
+        #         "negative": [""] * len(ex["query"]),
+        #     },
+        #     "cols": col_union,
+        #     "loss": MultipleNegativesRankingLoss,
+        #     "total_nrows": 2_660_000,  # Approximate number of triplets
+        # },
+        # "s2orc_title_abstract": {
+        #     "args": {
+        #         "path": "sentence-transformers/s2orc",
+        #         "split": "train",
+        #         "name": "title-abstract-pair",
+        #     },
+        #     "map_fn": lambda ex: {
+        #         "anchor": ex["title"],
+        #         "positive": ex["abstract"],
+        #         "negative": [""] * len(ex["title"]),
+        #     },
+        #     "cols": col_union,
+        #     "loss": MultipleNegativesRankingLoss,
+        #     "total_nrows": 41_800_000,  # Approximate number of pairs
+        # },
+        # "s2orc_abstract_citation": {
+        #     "args": {
+        #         "path": "sentence-transformers/s2orc",
+        #         "split": "train",
+        #         "name": "abstract-citation-pair",
+        #     },
+        #     "map_fn": lambda ex: {
+        #         "anchor": ex["abstract"],
+        #         "positive": ex["citation"],
+        #         "negative": [""] * len(ex["abstract"]),
+        #     },
+        #     "cols": col_union,
+        #     "loss": MultipleNegativesRankingLoss,
+        #     "total_nrows": 39_600_000,  # Approximate number of pairs
+        # },
+        # "s2orc_title_citation": {
+        #     "args": {
+        #         "path": "sentence-transformers/s2orc",
+        #         "split": "train",
+        #         "name": "title-citation-pair",
+        #     },
+        #     "map_fn": lambda ex: {
+        #         "anchor": ex["title"],
+        #         "positive": ex["citation"],
+        #         "negative": [""] * len(ex["title"]),
+        #     },
+        #     "loss": MultipleNegativesRankingLoss,
+        #     "cols": col_union,
+        #     "total_nrows": 51_000_000,  # Approximate number of pairs
+        # },
+        # "nasa-sde-st": {
+        #     "args": {"path": "nasa-impact/nasa-sde-st-corpus"},
+        #     "map_fn": lambda ex: {
+        #         "anchor": ex["query"],
+        #         "positive": ex["context"],
+        #         "negative": [""] * len(ex["query"]),
+        #     },
+        #     "cols": col_union,
+        #     "loss": MultipleNegativesRankingLoss,
+        #     "total_nrows": 1_100_000,  # Approximate number of pairs
+        # },
         # "pmc": {
         #     "args": {"path": "../data_prep/raw/pmc_open_access.py", "split": "train"},
         #     "map_fn": lambda ex: {"anchor": ex["MedlineCitation"]["Article"]["Article Title"], "positive": ex["MedlineCitation"]["Article"]["Abstract"]["AbstractText"]},
