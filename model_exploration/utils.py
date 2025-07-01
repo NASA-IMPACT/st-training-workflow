@@ -8,7 +8,6 @@ from typing import Dict, List, Optional, Union
 
 import distributed
 import torch
-import wandb
 from datasets import (
     Dataset,
     DatasetDict,
@@ -38,6 +37,8 @@ from sentence_transformers.training_args import (
 )
 from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
+
+import wandb
 
 
 def get_gpu_info():
@@ -127,7 +128,7 @@ def build_dataset_configs_s2(N_DATA_SRC=None) -> dict:
         return {
             "anchor": title,
             "positive": abstract,
-            "negative": "",
+            # "negative": "",
         }
 
     base = {
