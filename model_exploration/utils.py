@@ -654,32 +654,44 @@ def prepare_evaluators(
         - If no evaluators are created, a warning is printed, and the function returns None.
     """
 
+    # --- 1. Truncate datasets if max_per_split is set ---
     if max_per_split and max_per_split > 0:
         # Assume eval_ds.items() and v.select() work, or let errors propagate
         ds_dict = {
             k: v.select(range(min(max_per_split, len(v)))) for k, v in eval_ds.items()
         }
-
-        cache_dir = os.path.join(cache_dir, f"max_per_split_{max_per_split}")
+        max_per_split_str = str(max_per_split)
     else:
-        cache_dir = os.path.join(cache_dir, "max_per_split_None")
+        max_per_split_str = "None"
         ds_dict = eval_ds
 
-    os.makedirs(cache_dir, exist_ok=True)
+    # --- 2. Set up cache directory only if a path is provided ---
+    if cache_dir:
+        cache_dir = os.path.join(cache_dir, f"max_per_split_{max_per_split_str}")
+        os.makedirs(cache_dir, exist_ok=True)
+        print(f"Cache directory is set to: {cache_dir}")
+    else:
+        print("`cache_dir` is None. Caching is disabled.")
 
     evaluators = []
     all_ir_queries, all_ir_corpus, all_ir_rel_docs = {}, {}, {}
     all_triplet_anchors, all_triplet_positives, all_triplet_negatives = [], [], []
     all_mnrl_samples = []  # This will hold InputExample objects
 
-    # --- Process datasets ---
+    # --- 3. Process datasets ---
     for ds_name, ds in ds_dict.items():
         print("Transforming dataset source for Evaluation:", ds_name)
-        ds_cache_path = os.path.join(cache_dir, f"{ds_name}.pkl")
+        processed_data = None
+        ds_cache_path = os.path.join(cache_dir, f"{ds_name}.pkl") if cache_dir else None
 
-        if not os.path.isfile(ds_cache_path):
+        # Try to load from cache only if cache_dir and the file exist
+        if ds_cache_path and os.path.isfile(ds_cache_path):
+            print(f"Loading processed data for '{ds_name}' from cache.")
+            processed_data = joblib.load(ds_cache_path)
+
+        else:
             processed_data = {}
-            try:  # Add basic try-except around processing each dataset source
+            try:  # --- Process the data if not loaded from cache ---
                 column_names = ds.column_names
                 has_negatives = "negative" in column_names
                 has_anchor = "anchor" in column_names
@@ -724,7 +736,10 @@ def prepare_evaluators(
                     for anchor, positive in zip(ds["anchor"], ds["positive"])
                 ]
 
-                joblib.dump(processed_data, ds_cache_path)
+                # Save to cache only if cache_dir is specified
+                if ds_cache_path:
+                    print(f"Saving processed data for '{ds_name}' to cache.")
+                    joblib.dump(processed_data, ds_cache_path)
 
             except Exception as e:
                 print(
@@ -732,10 +747,7 @@ def prepare_evaluators(
                 )
                 continue  # Continue to next dataset if one fails
 
-        else:
-            processed_data = joblib.load(ds_cache_path)
-
-        # assign the variables from processed_data
+        # --- 4. Aggregate processed data ---
         all_ir_queries.update(processed_data.get("all_ir_queries", {}))
         all_ir_corpus.update(processed_data.get("all_ir_corpus", {}))
         all_ir_rel_docs.update(processed_data.get("all_ir_rel_docs", {}))
@@ -804,7 +816,6 @@ def prepare_evaluators(
                 f"Error creating MnrLossEvaluator or its DataLoader: {type(e).__name__}: {e}",
             )
 
-    # ... (Rest of prepare_evaluators remains the same) ...
     if not evaluators:
         print("Warning: No evaluators were successfully created.")
         return None
