@@ -1,5 +1,6 @@
 import argparse
 import datetime
+import inspect
 import math
 import os
 import random
@@ -14,6 +15,7 @@ from datasets import config as dataset_config
 from datasets import get_dataset_config_names, load_dataset, load_from_disk
 from distributed import init_ddp, print0
 from dotenv import load_dotenv
+from multidataset_sampler import WeightedBatchSampler
 from pretokenize import prepare_pre_tokenized_datasets
 from sentence_transformers import SentenceTransformer, SentenceTransformerTrainer
 from sentence_transformers.evaluation import (
@@ -22,6 +24,11 @@ from sentence_transformers.evaluation import (
     TripletEvaluator,
 )
 from sentence_transformers.losses import MultipleNegativesRankingLoss
+from sentence_transformers.sampler import (
+    MultiDatasetDefaultBatchSampler,
+    ProportionalBatchSampler,
+    RoundRobinBatchSampler,
+)
 from sentence_transformers.training_args import (
     BatchSamplers,
     MultiDatasetBatchSamplers,
@@ -29,6 +36,7 @@ from sentence_transformers.training_args import (
 )
 from torch.nn.parallel import DistributedDataParallel
 from torch.optim.lr_scheduler import LambdaLR
+from torch.utils.data import BatchSampler, ConcatDataset
 from transformers.optimization import get_scheduler  # For fallback in custom trainer
 from utils import (
     PreTokenizedCollator,
@@ -186,9 +194,16 @@ dataset_config.IN_MEMORY_MAX_SIZE = 800 * (1024**3)
 
 # ──────────────── Custom Trainer Class ────────────────
 class CustomSentenceTransformerTrainer(SentenceTransformerTrainer):
-    def __init__(self, *args_trainer, custom_lr_params: Dict = None, **kwargs_trainer):
+    def __init__(
+        self,
+        *args_trainer,
+        custom_lr_params: Dict = None,
+        dataset_configs=None,
+        **kwargs_trainer,
+    ):
         super().__init__(*args_trainer, **kwargs_trainer)
         self.custom_lr_params = custom_lr_params if custom_lr_params is not None else {}
+        self.dataset_configs = dataset_configs if dataset_configs is not None else {}
 
     def create_scheduler(
         self,
@@ -290,6 +305,88 @@ class CustomSentenceTransformerTrainer(SentenceTransformerTrainer):
         # and some potential call paths.
         return self.lr_scheduler
 
+    # override the get_multi_dataset_batch_sampler method
+    def get_multi_dataset_batch_sampler(
+        self,
+        dataset: ConcatDataset,
+        batch_samplers: list[BatchSampler],
+        generator: torch.Generator | None = None,
+        seed: int | None = 0,
+    ) -> BatchSampler:
+        """
+        Returns the appropriate multi-dataset batch sampler based on the ``multi_dataset_batch_sampler`` argument
+        in ``self.args``. This batch sampler class supports ``__len__`` and ``__iter__`` methods, and is used as the
+        ``batch_sampler`` to create the :class:`torch.utils.data.DataLoader`.
+
+        .. note::
+            Override this method to provide a custom multi-dataset batch sampler.
+
+        Args:
+            dataset (ConcatDataset): The concatenation of all datasets.
+            batch_samplers (List[BatchSampler]): List of batch samplers for each dataset in the concatenated dataset.
+            generator (torch.Generator, optional): Optional random number generator for shuffling the indices.
+            seed (int, optional): Optional seed for the random number generator
+        """
+
+        multi_batch_sampler_kwargs = {
+            "batch_samplers": batch_samplers,
+            "generator": generator,
+            "seed": seed,
+        }
+
+        # If the multi-dataset batch sampler is a WeightedBatchSampler, initialize it
+        if (
+            inspect.isclass(self.args.multi_dataset_batch_sampler)
+            and issubclass(
+                self.args.multi_dataset_batch_sampler,
+                MultiDatasetDefaultBatchSampler,
+            )
+            and hasattr(
+                self.args.multi_dataset_batch_sampler,
+                "__name__",
+            )
+            and self.args.multi_dataset_batch_sampler.__name__ == "WeightedBatchSampler"
+        ):
+
+            multi_batch_sampler_kwargs.update(
+                {
+                    "dataset_configs": self.dataset_configs,
+                },
+            )
+            return WeightedBatchSampler(dataset=dataset, **multi_batch_sampler_kwargs)
+
+        # If the multi-dataset batch sampler is a DefaultBatchSampler subclass, initialize it
+        if inspect.isclass(self.args.multi_dataset_batch_sampler) and issubclass(
+            self.args.multi_dataset_batch_sampler,
+            MultiDatasetDefaultBatchSampler,
+        ):
+            return self.args.multi_dataset_batch_sampler(
+                dataset,
+                **multi_batch_sampler_kwargs,
+            )
+
+        if callable(self.args.multi_dataset_batch_sampler):
+            return self.args.multi_dataset_batch_sampler(
+                dataset,
+                **multi_batch_sampler_kwargs,
+            )
+
+        # Otherwise, it's an MultiDatasetBatchSamplers instance and we use the samplers that match the enum values
+        if (
+            self.args.multi_dataset_batch_sampler
+            == MultiDatasetBatchSamplers.ROUND_ROBIN
+        ):
+            return RoundRobinBatchSampler(dataset=dataset, **multi_batch_sampler_kwargs)
+
+        if (
+            self.args.multi_dataset_batch_sampler
+            == MultiDatasetBatchSamplers.PROPORTIONAL
+        ):
+            return ProportionalBatchSampler(
+                dataset=dataset,
+                **multi_batch_sampler_kwargs,
+            )
+
 
 # ──────────────── Main ────────────────
 def main(local_rank, rank):
@@ -382,6 +479,7 @@ def main(local_rank, rank):
         batch_sampler=BatchSamplers.NO_DUPLICATES,
         # batch_sampler=BatchSamplers.BATCH_SAMPLER,
         # batch_sampler_type=MultiDatasetBatchSamplers.PROPORTIONAL, # TRY THIS
+        multi_dataset_batch_sampler=WeightedBatchSampler,
         eval_strategy=eval_strategy,
         eval_steps=EVAL_AND_SAVE_STEPS,
         save_strategy="steps",
@@ -413,6 +511,7 @@ def main(local_rank, rank):
         evaluator=val_evaluator,
         data_collator=collator,
         custom_lr_params=custom_lr_params_for_trainer,  # Pass our custom params
+        dataset_configs=configs,  # Pass dataset configs for WeightedBatchSampler
     )
 
     if RESUME_CHECKPOINT_PATH is not None:

@@ -138,6 +138,7 @@ def build_dataset_configs_s2(N_DATA_SRC=None) -> dict:
             "args": {"path": "nasa-impact/nasa-sde-st-corpus"},
             "map_fn": lambda ex: {"anchor": ex["query"], "positive": ex["context"]},
             "loss": MultipleNegativesRankingLoss,
+            "weight": 5,  # Optional weight for sampling this datadet when using WeightedBatchSampler; if not specified, defaults to 1.0
         },
         "pubmed_v3": {
             "args": {"path": "../data_prep/raw/pubmed.py", "split": "train"},
@@ -159,6 +160,7 @@ def build_dataset_configs_s2(N_DATA_SRC=None) -> dict:
                 "positive": ex["positives"]["docs"][0],
             },
             "loss": MultipleNegativesRankingLoss,
+            "weight": 3,  # Optional weight for sampling this datadet when using WeightedBatchSampler; if not specified, defaults to 1.0
         },
         "s2orc_title_abstract": {
             "args": {
@@ -770,6 +772,7 @@ def prepare_evaluators(
                 accuracy_at_k=[1, 5, 10],
                 precision_recall_at_k=[1, 5, 10],
                 map_at_k=[1, 5, 10],
+                corpus_chunk_size=5000,
                 show_progress_bar=True,
                 write_csv=True,
             )
