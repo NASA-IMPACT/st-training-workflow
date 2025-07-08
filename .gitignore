@@ -9,7 +9,7 @@ __pycache__/
 tmp/
 data/
 # *.ipynb
-*.png
+# *.png
 *.swp
 *.csv
 *.pdf
