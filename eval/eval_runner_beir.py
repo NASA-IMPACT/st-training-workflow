@@ -32,6 +32,7 @@ models = {
     "modernbert-embed-base": "nomic-ai/modernbert-embed-base",
     "nasa-smd-ibm-st-v2": "nasa-impact/nasa-smd-ibm-st-v2",
     "indus-sde-st-v0.1": "nasa-impact/indus-sde-st-v0.1",
+    "indus-sde-st-v0.2_whole-moon-14": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/model-qr3ln5om:v1/checkpoint-116000",
 }
 
 _DATASETS = [
