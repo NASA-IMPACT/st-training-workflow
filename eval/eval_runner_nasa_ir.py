@@ -9,12 +9,13 @@ import torch
 from custum_evals import (
     MultiGPUInformationRetrievalEvaluator,  # Import the custom evaluator
 )
+from custum_evals import DummyModel
 from datasets import load_dataset
 from sentence_transformers import SentenceTransformer
 from sentence_transformers.evaluation import InformationRetrievalEvaluator
 
 ks = [1, 3, 5, 10]
-json_output_path = "results_json/nasa_ir_eval_dump_dp.json"
+json_output_path = "results_json/nasa_ir_eval_dump.json"
 output_dir_plots = "results_plots/nasa_ir_eval_plots"
 
 models = {
@@ -24,19 +25,26 @@ models = {
     "indus-sde-st-v0.2_whole-moon-14": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/model-qr3ln5om:v1/checkpoint-116000",
     "indus-sde-st-v0.2_atomic-plasma-15": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/model-ykf0bews:v1/checkpoint-13000",
     "indus-sde-st-v0.2_vocal-river-16": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/model-dexwvlkj:v1/checkpoint-13000",
+    "indus-sde-st-v0.2_super-armadillo-25": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/model-1ogtkl75:v1/checkpoint-268500",
+    "indus-sde-st-v0.2_drawn-puddle-31": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/model-3x845j4d:v1/checkpoint-11000",
+}
+embeddings = {
+    "[OpenAI]text-embedding-3-small": "/rhome/sawale/indus_traning/sentense_transformers/eval/openai_emb_cache/text-embedding-3-small/nasa-smd-IR-benchmark",
+    "[OpenAI]text-embedding-3-large": "/rhome/sawale/indus_traning/sentense_transformers/eval/openai_emb_cache/text-embedding-3-large/nasa-smd-IR-benchmark",
 }
 
+dataset_path = "nasa-impact/nasa-smd-IR-benchmark"
 corpus = load_dataset(
-    "nasa-impact/nasa-smd-IR-benchmark",
-    data_files="https://huggingface.co/datasets/nasa-impact/nasa-smd-IR-benchmark/resolve/main/corpus.jsonl",
+    dataset_path,
+    data_files="corpus.jsonl",
     split="train",
 )
 queries = load_dataset(
-    "nasa-impact/nasa-smd-IR-benchmark",
-    data_files="https://huggingface.co/datasets/nasa-impact/nasa-smd-IR-benchmark/resolve/main/queries.jsonl",
+    dataset_path,
+    data_files="queries.jsonl",
     split="train",
 )
-relevant_docs_data = load_dataset("nasa-impact/nasa-smd-IR-benchmark", split="test")
+relevant_docs_data = load_dataset(dataset_path, split="test")
 
 
 corpus = {row["_id"]: row["text"] for i, row in enumerate(corpus)}
@@ -85,10 +93,35 @@ if __name__ == "__main__":
             continue
 
         model = SentenceTransformer(model_path)
-
         results = evaluator(model)
         all_results[model_name] = results
 
+        print(results)
+
+    # when you give embeddings directly
+    for embedding_name, embedding_path in embeddings.items():
+        if embedding_name in all_results:
+            print(f"Embedding {embedding_name} already evaluated. Skipping...")
+            continue
+
+        print(f"Loading embeddings for {embedding_name} from {embedding_path}")
+        corpus_df = pd.read_parquet(
+            os.path.join(embedding_path, "corpus_embeddings.parquet"),
+        )
+        queries_df = pd.read_parquet(
+            os.path.join(embedding_path, "queries_embeddings.parquet"),
+        )
+
+        dummy_model = DummyModel()
+        # corpus_embeddings = torch.tensor(corpus_df["embeddings"].values.tolist())
+        # queries_embeddings = torch.tensor(queries_df["embeddings"].values.tolist())
+
+        results = evaluator(
+            model=dummy_model,
+            corpus_df=corpus_df,
+            query_df=queries_df,
+        )
+        all_results[embedding_name] = results
         print(results)
 
     with open(json_output_path, "w", encoding="utf-8") as f:
@@ -125,8 +158,8 @@ if __name__ == "__main__":
         kind="bar",
         col_wrap=3,
         sharey=False,
-        height=4,
-        aspect=1.5,
+        height=5,
+        aspect=2.75,
         legend_out=True,
     )
 
@@ -156,7 +189,7 @@ if __name__ == "__main__":
                 va="center",
                 xytext=(0, 5),  # 5 points vertical offset
                 textcoords="offset points",
-                fontsize=8,
+                fontsize=10,
             )
 
     # Move and format the legend

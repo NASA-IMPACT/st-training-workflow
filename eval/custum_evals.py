@@ -1,23 +1,65 @@
+import csv
 import heapq
 import json
 import logging
 import os
+from contextlib import nullcontext
 
+import numpy as np
+import pandas as pd
 import torch
+from sentence_transformers import util
 from sentence_transformers.evaluation import (
     InformationRetrievalEvaluator,
     NanoBEIREvaluator,
+    TripletEvaluator,
 )
 from sentence_transformers.evaluation.NanoBEIREvaluator import (
     DatasetNameType,
     dataset_name_to_id,
 )
 from sentence_transformers.SentenceTransformer import SentenceTransformer
-from sentence_transformers.util import is_datasets_available
+from sentence_transformers.similarity_functions import SimilarityFunction
+from sentence_transformers.util import (
+    is_datasets_available,
+    pairwise_cos_sim,
+    pairwise_dot_score,
+    pairwise_euclidean_sim,
+    pairwise_manhattan_sim,
+)
 from torch import Tensor
-from tqdm import trange
+from tqdm import tqdm, trange
 
 logger = logging.getLogger(__name__)
+
+
+# Define a dummy placeholder for the model card data attribute
+class DummyModelCardData:
+    def set_evaluation_metrics(self, *args, **kwargs):
+        """This is a dummy method. It does nothing."""
+        pass
+
+
+# Define the complete, self-contained dummy model
+class DummyModel:
+    """
+    A standalone placeholder model that mimics all necessary attributes
+    and methods for the InformationRetrievalEvaluator when using
+    pre-computed embeddings.
+    """
+
+    def __init__(self):
+        self.similarity = util.cos_sim
+        self.similarity_fn_name = "cosine"
+        self.model_card_data = DummyModelCardData()
+
+    def start_multi_process_pool(self, *args, **kwargs):
+        """Dummy method. Returns an empty dict."""
+        return {}
+
+    def stop_multi_process_pool(self, pool):
+        """Dummy method. Does nothing."""
+        pass
 
 
 class MultiGPUInformationRetrievalEvaluator(InformationRetrievalEvaluator):
@@ -33,7 +75,8 @@ class MultiGPUInformationRetrievalEvaluator(InformationRetrievalEvaluator):
         corpus_model=None,
         corpus_embeddings: Tensor | None = None,
         output_path: str | None = None,
-        query_embeddings: Tensor | None = None,  # new parameter
+        corpus_df: pd.DataFrame | None = None,  # new parameter
+        query_df: pd.DataFrame | None = None,  # new parameter
     ) -> dict[str, float]:
         if corpus_model is None:
             corpus_model = model
@@ -48,7 +91,7 @@ class MultiGPUInformationRetrievalEvaluator(InformationRetrievalEvaluator):
 
         pool = model.start_multi_process_pool()
         # Compute embedding for the queries
-        if query_embeddings is None:
+        if query_df is None:
             logger.info(f"Computing embeddings for queries")
             print("Computing query embeddings")
             query_embeddings = model.encode(
@@ -60,12 +103,16 @@ class MultiGPUInformationRetrievalEvaluator(InformationRetrievalEvaluator):
                 prompt_name=self.query_prompt_name,
                 prompt=self.query_prompt,
             )
+        else:
+            # filter and reorder the embeddings to only include the queries we have
+            query_df = query_df.set_index("id").loc[self.queries_ids].reset_index()
+            query_embeddings = torch.tensor(query_df["embeddings"].values.tolist())
 
         queries_result_list = {}
         for name in self.score_functions:
             queries_result_list[name] = [[] for _ in range(len(query_embeddings))]
 
-        if corpus_embeddings is None:
+        if (corpus_embeddings is None) and (corpus_df is None):
             logger.info(f"Computing embeddings for corpus")
             print("Computing corpus embeddings")
             corpus_embeddings = model.encode(
@@ -77,6 +124,8 @@ class MultiGPUInformationRetrievalEvaluator(InformationRetrievalEvaluator):
                 prompt_name=self.corpus_prompt_name,
                 prompt=self.corpus_prompt,
             )
+        elif corpus_df is not None:
+            corpus_embeddings = torch.tensor(corpus_df["embeddings"].values.tolist())
         model.stop_multi_process_pool(pool)
 
         # Iterate over chunks of the corpus
@@ -187,6 +236,12 @@ class MultiGPUInformationRetrievalEvaluator(InformationRetrievalEvaluator):
         logger.info(f"Corpus: {len(self.corpus)}\n")
 
         # Compute scores
+        for query_itr in range(len(queries_result_list["cosine"])):
+            try:
+                query_id = self.queries_ids[query_itr]
+            except IndexError:
+                print("query_itr: ", query_itr)
+
         scores = {
             name: self.compute_metrics(queries_result_list[name])
             for name in self.score_functions
@@ -198,6 +253,134 @@ class MultiGPUInformationRetrievalEvaluator(InformationRetrievalEvaluator):
             self.output_scores(scores[name])
 
         return scores
+
+
+class MultiGPUTripletEvaluator(TripletEvaluator):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    # overrding the method
+    def __call__(
+        self,
+        model: SentenceTransformer,
+        output_path: str = None,
+        epoch: int = -1,
+        steps: int = -1,
+    ) -> dict[str, float]:
+        if epoch != -1:
+            if steps == -1:
+                out_txt = f" after epoch {epoch}"
+            else:
+                out_txt = f" in epoch {epoch} after {steps} steps"
+        else:
+            out_txt = ""
+        if self.truncate_dim is not None:
+            out_txt += f" (truncated to {self.truncate_dim})"
+
+        logger.info(
+            f"TripletEvaluator: Evaluating the model on the {self.name} dataset{out_txt}:",
+        )
+
+        pool = model.start_multi_process_pool()
+        with nullcontext() if self.truncate_dim is None else model.truncate_sentence_embeddings(
+            self.truncate_dim,
+        ):
+            embeddings_anchors = model.encode(
+                self.anchors,
+                batch_size=self.batch_size,
+                show_progress_bar=self.show_progress_bar,
+                convert_to_numpy=True,
+                pool=pool,
+            )
+            embeddings_positives = model.encode(
+                self.positives,
+                batch_size=self.batch_size,
+                show_progress_bar=self.show_progress_bar,
+                convert_to_numpy=True,
+                pool=pool,
+            )
+            embeddings_negatives = model.encode(
+                self.negatives,
+                batch_size=self.batch_size,
+                show_progress_bar=self.show_progress_bar,
+                convert_to_numpy=True,
+                pool=pool,
+            )
+        model.stop_multi_process_pool(pool)
+        if not self.similarity_fn_names:
+            self.similarity_fn_names = [model.similarity_fn_name]
+            self._append_csv_headers(self.similarity_fn_names)
+
+        similarity_functions = {
+            "cosine": lambda anchors, positives, negatives: (
+                pairwise_cos_sim(anchors, positives),
+                pairwise_cos_sim(anchors, negatives),
+            ),
+            "dot": lambda anchors, positives, negatives: (
+                pairwise_dot_score(anchors, positives),
+                pairwise_dot_score(anchors, negatives),
+            ),
+            "manhattan": lambda anchors, positives, negatives: (
+                pairwise_manhattan_sim(anchors, positives),
+                pairwise_manhattan_sim(anchors, negatives),
+            ),
+            "euclidean": lambda anchors, positives, negatives: (
+                pairwise_euclidean_sim(anchors, positives),
+                pairwise_euclidean_sim(anchors, negatives),
+            ),
+        }
+
+        metrics = {}
+        for fn_name in self.similarity_fn_names:
+            if fn_name in similarity_functions:
+                positive_scores, negative_scores = similarity_functions[fn_name](
+                    embeddings_anchors,
+                    embeddings_positives,
+                    embeddings_negatives,
+                )
+                accuracy = (
+                    (positive_scores > negative_scores + self.margin[fn_name])
+                    .float()
+                    .mean()
+                    .item()
+                )
+                metrics[f"{fn_name}_accuracy"] = accuracy
+                logger.info(
+                    f"Accuracy {fn_name.capitalize()} Similarity:\t{accuracy:.2%}",
+                )
+
+        if output_path is not None and self.write_csv:
+            csv_path = os.path.join(output_path, self.csv_file)
+            if not os.path.isfile(csv_path):
+                with open(csv_path, newline="", mode="w", encoding="utf-8") as f:
+                    writer = csv.writer(f)
+                    writer.writerow(self.csv_headers)
+                    writer.writerow([epoch, steps] + list(metrics.values()))
+
+            else:
+                with open(csv_path, newline="", mode="a", encoding="utf-8") as f:
+                    writer = csv.writer(f)
+                    writer.writerow([epoch, steps] + list(metrics.values()))
+
+        if len(self.similarity_fn_names) > 1:
+            metrics["max_accuracy"] = max(metrics.values())
+
+        if self.main_similarity_function:
+            self.primary_metric = {
+                SimilarityFunction.COSINE: "cosine_accuracy",
+                SimilarityFunction.DOT_PRODUCT: "dot_accuracy",
+                SimilarityFunction.EUCLIDEAN: "euclidean_accuracy",
+                SimilarityFunction.MANHATTAN: "manhattan_accuracy",
+            }.get(self.main_similarity_function)
+        else:
+            if len(self.similarity_fn_names) > 1:
+                self.primary_metric = "max_accuracy"
+            else:
+                self.primary_metric = f"{self.similarity_fn_names[0]}_accuracy"
+
+        metrics = self.prefix_name_to_metrics(metrics, self.name)
+        self.store_metrics_in_model_card_data(model, metrics, epoch, steps)
+        return metrics
 
 
 class MultiGPUNanoBEIREvaluator(NanoBEIREvaluator):
@@ -254,3 +437,156 @@ class MultiGPUNanoBEIREvaluator(NanoBEIREvaluator):
             name=human_readable_name,
             **ir_evaluator_kwargs,
         )
+
+    def __call__(
+        self,
+        model: SentenceTransformer,
+        output_path: str = None,
+        epoch: int = -1,
+        steps: int = -1,
+        corpus_dfs: dict = None,
+        query_dfs: dict = None,
+        *args,
+        **kwargs,
+    ) -> dict[str, float]:
+        per_metric_results = {}
+        per_dataset_results = {}
+        if epoch != -1:
+            if steps == -1:
+                out_txt = f" after epoch {epoch}"
+            else:
+                out_txt = f" in epoch {epoch} after {steps} steps"
+        else:
+            out_txt = ""
+        if self.truncate_dim is not None:
+            out_txt += f" (truncated to {self.truncate_dim})"
+        logger.info(
+            f"NanoBEIR Evaluation of the model on {self.dataset_names} dataset{out_txt}:",
+        )
+
+        if self.score_functions is None:
+            self.score_functions = {model.similarity_fn_name: model.similarity}
+            self.score_function_names = [model.similarity_fn_name]
+            self._append_csv_headers(self.score_function_names)
+
+        for evaluator in tqdm(
+            self.evaluators,
+            desc="Evaluating datasets",
+            disable=not self.show_progress_bar,
+        ):
+            logger.info(f"Evaluating {evaluator.name}")
+            if corpus_dfs and query_dfs:
+                evaluation = evaluator(
+                    model,
+                    output_path,
+                    epoch,
+                    steps,
+                    corpus_df=corpus_dfs.get(evaluator.name),
+                    query_df=query_dfs.get(evaluator.name),
+                )
+            else:
+                evaluation = evaluator(model, output_path, epoch, steps)
+            for k in evaluation:
+                if self.truncate_dim:
+                    dataset, _, metric = k.split("_", maxsplit=2)
+                else:
+                    dataset, metric = k.split("_", maxsplit=1)
+                if metric not in per_metric_results:
+                    per_metric_results[metric] = []
+                per_dataset_results[dataset + "_" + metric] = evaluation[k]
+                per_metric_results[metric].append(evaluation[k])
+
+        agg_results = {}
+        for metric in per_metric_results:
+            agg_results[metric] = self.aggregate_fn(per_metric_results[metric])
+
+        if output_path is not None and self.write_csv:
+            csv_path = os.path.join(output_path, self.csv_file)
+            if not os.path.isfile(csv_path):
+                fOut = open(csv_path, mode="w", encoding="utf-8")
+                fOut.write(",".join(self.csv_headers))
+                fOut.write("\n")
+
+            else:
+                fOut = open(csv_path, mode="a", encoding="utf-8")
+
+            output_data = [epoch, steps]
+            for name in self.score_function_names:
+                for k in self.accuracy_at_k:
+                    output_data.append(agg_results[f"{name}_accuracy@{k}"])
+
+                for k in self.precision_recall_at_k:
+                    output_data.append(agg_results[f"{name}_precision@{k}"])
+                    output_data.append(agg_results[f"{name}_recall@{k}"])
+
+                for k in self.mrr_at_k:
+                    output_data.append(agg_results[f"{name}_mrr@{k}"])
+
+                for k in self.ndcg_at_k:
+                    output_data.append(agg_results[f"{name}_ndcg@{k}"])
+
+                for k in self.map_at_k:
+                    output_data.append(agg_results[f"{name}_map@{k}"])
+
+            fOut.write(",".join(map(str, output_data)))
+            fOut.write("\n")
+            fOut.close()
+
+        if not self.primary_metric:
+            if self.main_score_function is None:
+                score_function = max(
+                    [
+                        (name, agg_results[f"{name}_ndcg@{max(self.ndcg_at_k)}"])
+                        for name in self.score_function_names
+                    ],
+                    key=lambda x: x[1],
+                )[0]
+                self.primary_metric = f"{score_function}_ndcg@{max(self.ndcg_at_k)}"
+            else:
+                self.primary_metric = (
+                    f"{self.main_score_function.value}_ndcg@{max(self.ndcg_at_k)}"
+                )
+
+        avg_queries = np.mean([len(evaluator.queries) for evaluator in self.evaluators])
+        avg_corpus = np.mean([len(evaluator.corpus) for evaluator in self.evaluators])
+        logger.info(f"Average Queries: {avg_queries}")
+        logger.info(f"Average Corpus: {avg_corpus}\n")
+
+        for name in self.score_function_names:
+            logger.info(f"Aggregated for Score Function: {name}")
+            for k in self.accuracy_at_k:
+                logger.info(
+                    "Accuracy@{}: {:.2f}%".format(
+                        k,
+                        agg_results[f"{name}_accuracy@{k}"] * 100,
+                    ),
+                )
+
+            for k in self.precision_recall_at_k:
+                logger.info(
+                    "Precision@{}: {:.2f}%".format(
+                        k,
+                        agg_results[f"{name}_precision@{k}"] * 100,
+                    ),
+                )
+                logger.info(
+                    "Recall@{}: {:.2f}%".format(
+                        k,
+                        agg_results[f"{name}_recall@{k}"] * 100,
+                    ),
+                )
+
+            for k in self.mrr_at_k:
+                logger.info("MRR@{}: {:.4f}".format(k, agg_results[f"{name}_mrr@{k}"]))
+
+            for k in self.ndcg_at_k:
+                logger.info(
+                    "NDCG@{}: {:.4f}".format(k, agg_results[f"{name}_ndcg@{k}"]),
+                )
+
+        agg_results = self.prefix_name_to_metrics(agg_results, self.name)
+        self.store_metrics_in_model_card_data(model, agg_results, epoch, steps)
+
+        per_dataset_results.update(agg_results)
+
+        return per_dataset_results

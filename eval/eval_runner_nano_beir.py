@@ -6,7 +6,7 @@ import pandas as pd
 import seaborn as sns
 import sentence_transformers.util as util
 import torch
-from custum_evals import MultiGPUNanoBEIREvaluator
+from custum_evals import DummyModel, MultiGPUNanoBEIREvaluator
 from datasets import load_dataset
 from matplotlib import pyplot as plt
 from sentence_transformers import SentenceTransformer
@@ -23,6 +23,13 @@ models = {
     "indus-sde-st-v0.2_whole-moon-14": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/model-qr3ln5om:v1/checkpoint-116000",
     "indus-sde-st-v0.2_atomic-plasma-15": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/model-ykf0bews:v1/checkpoint-13000",
     "indus-sde-st-v0.2_vocal-river-16": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/model-dexwvlkj:v1/checkpoint-13000",
+    "indus-sde-st-v0.2_super-armadillo-25": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/model-1ogtkl75:v1/checkpoint-268500",
+    "indus-sde-st-v0.2_drawn-puddle-31": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/model-3x845j4d:v1/checkpoint-11000",
+}
+
+embeddings = {
+    "[OpenAI]text-embedding-3-small": "/rhome/sawale/indus_traning/sentense_transformers/eval/openai_emb_cache/nanobeir/text-embedding-3-small",
+    "[OpenAI]text-embedding-3-large": "/rhome/sawale/indus_traning/sentense_transformers/eval/openai_emb_cache/nanobeir/text-embedding-3-large",
 }
 
 
@@ -63,6 +70,43 @@ if __name__ == "__main__":
         model = SentenceTransformer(model_path)
         results = evaluator(model)
         all_results[model_name] = results
+        print(results)
+
+    # adding results for embeddings
+    for embedding_name, embedding_path in embeddings.items():
+        if embedding_name in all_results:
+            print(f"Embedding {embedding_name} already evaluated. Skipping...")
+            continue
+
+        print(f"Loading embeddings for {embedding_name} from {embedding_path}")
+
+        corpus_dfs = {}
+        query_dfs = {}
+
+        for dataset_name in [
+            evaluator._get_human_readable_name(n) for n in evaluator.dataset_names
+        ]:
+            corpus_path = os.path.join(
+                embedding_path,
+                dataset_name,
+                "corpus_embeddings.parquet",
+            )
+            queries_path = os.path.join(
+                embedding_path,
+                dataset_name,
+                "queries_embeddings.parquet",
+            )
+
+            corpus_dfs[dataset_name] = pd.read_parquet(corpus_path)
+            query_dfs[dataset_name] = pd.read_parquet(queries_path)
+
+        dummy_model = DummyModel()
+        results = evaluator(
+            model=dummy_model,
+            corpus_dfs=corpus_dfs,
+            query_dfs=query_dfs,
+        )
+        all_results[embedding_name] = results
         print(results)
 
     # before we save the json, we need to add mean for each dataset
@@ -171,7 +215,7 @@ if __name__ == "__main__":
         fig, axes = plt.subplots(
             1,
             len(unique_metric_types),
-            figsize=(14, 6),
+            figsize=(18, 6),
             sharey=False,
         )
 
