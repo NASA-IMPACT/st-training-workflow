@@ -10,7 +10,6 @@ from typing import Dict, List, Optional, Union
 import distributed
 import joblib
 import torch
-import wandb
 from datasets import (
     Dataset,
     DatasetDict,
@@ -41,6 +40,8 @@ from sentence_transformers.training_args import (
 from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+
+import wandb
 
 
 def get_gpu_info():
@@ -202,16 +203,16 @@ def build_dataset_configs_s2(N_DATA_SRC=None) -> dict:
             },
             "loss": MultipleNegativesRankingLoss,
         },
-        "pmc": {
-            "args": {"path": "../data_prep/raw/pmc_open_access.py", "split": "train"},
-            "map_fn": lambda ex: {
-                "anchor": ex["MedlineCitation"]["Article"]["Article Title"],
-                "positive": ex["MedlineCitation"]["Article"]["Abstract"][
-                    "AbstractText"
-                ],
-            },
-            "loss": MultipleNegativesRankingLoss,
-        },
+        # "pmc": {
+        #     "args": {"path": "../data_prep/raw/pmc_open_access.py", "split": "train"},
+        #     "map_fn": lambda ex: {
+        #         "anchor": ex["MedlineCitation"]["Article"]["Article Title"],
+        #         "positive": ex["MedlineCitation"]["Article"]["Abstract"][
+        #             "AbstractText"
+        #         ],
+        #     },
+        #     "loss": MultipleNegativesRankingLoss,
+        # },
     }
 
     if N_DATA_SRC is not None:

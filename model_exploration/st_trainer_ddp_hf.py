@@ -9,7 +9,6 @@ from typing import Dict, Union
 
 import distributed
 import torch
-import wandb
 from datasets import Dataset, DatasetDict, concatenate_datasets
 from datasets import config as dataset_config
 from datasets import get_dataset_config_names, load_dataset, load_from_disk
@@ -46,6 +45,8 @@ from utils import (
     load_and_cache_datasets,
     prepare_evaluators,
 )
+
+import wandb
 
 # ──────────────── Constants ────────────────
 
@@ -484,7 +485,7 @@ def main(local_rank, rank):
         eval_steps=EVAL_AND_SAVE_STEPS,
         save_strategy="steps",
         save_steps=EVAL_AND_SAVE_STEPS,
-        save_total_limit=2,
+        save_total_limit=40,
         logging_steps=EVAL_AND_SAVE_STEPS,
         learning_rate=LEARNING_RATE,
         gradient_accumulation_steps=GRADIENT_ACCUMULATION_STEPS,
@@ -526,7 +527,11 @@ def main(local_rank, rank):
     if distributed.is_main_process():
         eval_cache_dir = CACHE_DIR + "_evaluator/test"
         test_evaluator = prepare_evaluators(
-            {n: s["test"] for n, s in ds_dict.items()},
+            {
+                n: s["validation"]
+                for n, s in ds_dict.items()
+                if n in ("nasa-sde-st", "nasa_ads")
+            },  # NOTE (for testing) evaluate only the ade and sde datasets
             max_per_split=None,
             BATCH_SIZE=BATCH_SIZE,
             cache_dir=eval_cache_dir,
