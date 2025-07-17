@@ -1,0 +1,2420 @@
+_wandb:
+    value:
+        cli_version: 0.19.11
+        m:
+            - "1": eval/ir_evaluator_cosine_map@10
+              "5": 2
+              "6":
+                - 1
+                - 3
+              "7": []
+            - "1": train/global_step
+              "6":
+                - 3
+              "7": []
+            - "1": eval/runtime
+              "5": 2
+              "6":
+                - 1
+                - 3
+              "7": []
+            - "1": eval/ir_evaluator_cosine_accuracy@10
+              "5": 2
+              "6":
+                - 1
+                - 3
+              "7": []
+            - "1": eval/ir_evaluator_cosine_precision@5
+              "5": 2
+              "6":
+                - 1
+                - 3
+              "7": []
+            - "1": eval/ir_evaluator_cosine_mrr@10
+              "5": 2
+              "6":
+                - 1
+                - 3
+              "7": []
+            - "1": eval/ir_evaluator_cosine_recall@10
+              "5": 2
+              "6":
+                - 1
+                - 3
+              "7": []
+            - "1": eval/ir_evaluator_cosine_mrr@1
+              "5": 2
+              "6":
+                - 1
+                - 3
+              "7": []
+            - "1": eval/ir_evaluator_cosine_accuracy@5
+              "5": 2
+              "6":
+                - 1
+                - 3
+              "7": []
+            - "1": eval/mnr_loss/sum
+              "5": 2
+              "6":
+                - 1
+                - 3
+              "7": []
+            - "1": eval/ir_evaluator_cosine_accuracy@1
+              "5": 2
+              "6":
+                - 1
+                - 3
+              "7": []
+            - "1": eval/mnr_loss/avg
+              "5": 2
+              "6":
+                - 1
+                - 3
+              "7": []
+            - "1": eval/steps_per_second
+              "5": 2
+              "6":
+                - 1
+                - 3
+              "7": []
+            - "1": train/grad_norm
+              "5": 2
+              "6":
+                - 1
+                - 3
+              "7": []
+            - "1": eval/ir_evaluator_cosine_recall@5
+              "5": 2
+              "6":
+                - 1
+                - 3
+              "7": []
+            - "1": eval/ir_evaluator_cosine_map@1
+              "5": 2
+              "6":
+                - 1
+                - 3
+              "7": []
+            - "1": eval/ir_evaluator_cosine_ndcg@10
+              "5": 2
+              "6":
+                - 1
+                - 3
+              "7": []
+            - "1": eval/ir_evaluator_cosine_precision@1
+              "5": 2
+              "6":
+                - 1
+                - 3
+              "7": []
+            - "1": eval/ir_evaluator_cosine_recall@1
+              "5": 2
+              "6":
+                - 1
+                - 3
+              "7": []
+            - "1": train/loss
+              "5": 2
+              "6":
+                - 1
+                - 3
+              "7": []
+            - "1": train/epoch
+              "5": 2
+              "6":
+                - 1
+                - 3
+              "7": []
+            - "1": eval/ir_evaluator_cosine_mrr@5
+              "5": 2
+              "6":
+                - 1
+                - 3
+              "7": []
+            - "1": eval/samples_per_second
+              "5": 2
+              "6":
+                - 1
+                - 3
+              "7": []
+            - "1": eval/triplet_evaluator_cosine_accuracy
+              "5": 2
+              "6":
+                - 1
+                - 3
+              "7": []
+            - "1": eval/ir_evaluator_cosine_precision@10
+              "5": 2
+              "6":
+                - 1
+                - 3
+              "7": []
+            - "1": eval/sequential_score
+              "5": 2
+              "6":
+                - 1
+                - 3
+              "7": []
+            - "1": eval/ir_evaluator_cosine_ndcg@5
+              "5": 2
+              "6":
+                - 1
+                - 3
+              "7": []
+            - "1": train/learning_rate
+              "5": 2
+              "6":
+                - 1
+                - 3
+              "7": []
+            - "1": eval/ir_evaluator_cosine_ndcg@1
+              "5": 2
+              "6":
+                - 1
+                - 3
+              "7": []
+            - "1": eval/ir_evaluator_cosine_map@5
+              "5": 2
+              "6":
+                - 1
+                - 3
+              "7": []
+        python_version: 3.11.11
+        t:
+            "1":
+                - 1
+                - 5
+                - 11
+                - 49
+                - 51
+                - 53
+                - 55
+                - 71
+                - 75
+            "2":
+                - 1
+                - 5
+                - 11
+                - 49
+                - 51
+                - 53
+                - 55
+                - 71
+                - 75
+            "3":
+                - 5
+                - 7
+                - 14
+                - 23
+                - 55
+                - 62
+                - 66
+            "4": 3.11.11
+            "5": 0.19.11
+            "6": 4.52.4
+            "8":
+                - 5
+            "9":
+                "1": transformers_trainer
+            "10":
+                - 21
+            "12": 0.19.11
+            "13": linux-x86_64
+accelerator_config:
+    value:
+        dispatch_batches: null
+        even_batches: true
+        gradient_accumulation_kwargs: null
+        non_blocking: false
+        split_batches: false
+        use_seedable_sampler: true
+adafactor:
+    value: false
+adam_beta1:
+    value: 0.9
+adam_beta2:
+    value: 0.999
+adam_epsilon:
+    value: 1e-08
+auto_find_batch_size:
+    value: false
+average_tokens_across_devices:
+    value: false
+batch_eval_metrics:
+    value: false
+batch_sampler:
+    value: no_duplicates
+batch_size:
+    value: 16
+bf16:
+    value: true
+bf16_full_eval:
+    value: false
+cosine_cycle_steps_custom:
+    value: 8000
+cosine_magnitude_fraction_custom:
+    value: 0.1
+data_cache_dir:
+    value: ../data/stage1_cache/NROWS_None
+data_seed:
+    value: null
+dataloader_drop_last:
+    value: true
+dataloader_num_workers:
+    value: 0
+dataloader_persistent_workers:
+    value: false
+dataloader_pin_memory:
+    value: true
+dataloader_prefetch_factor:
+    value: null
+dataset_src_sizes:
+    value:
+        Coco_Captions:
+            test: 20700
+            total: 414010
+            train: 372610
+            validation: 20700
+        Flickr30k_Captions:
+            test: 7944
+            total: 158881
+            train: 142993
+            validation: 7944
+        Gooaq:
+            test: 150624
+            total: 3012496
+            train: 2711248
+            validation: 150624
+        Natural_Questions:
+            test: 5011
+            total: 100231
+            train: 90209
+            validation: 5011
+        PAQ:
+            test: 3200000
+            total: 64000000
+            train: 57600000
+            validation: 3200000
+        StackExchange_Duplicates_body_body:
+            test: 12500
+            total: 250000
+            train: 225000
+            validation: 12500
+        StackExchange_Duplicates_title_title:
+            test: 15250
+            total: 305000
+            train: 274500
+            validation: 15250
+        StackExchange_Duplicates_titlebody_titlebody:
+            test: 12500
+            total: 250000
+            train: 225000
+            validation: 12500
+        StackExchange_Math_title_answer:
+            test: 55000
+            total: 1100000
+            train: 990000
+            validation: 55000
+        StackExchange_Math_titlebody_answer:
+            test: 55000
+            total: 1100000
+            train: 990000
+            validation: 55000
+        StackExchange_title_best_answer_3dprinting:
+            test: 174
+            total: 3488
+            train: 3140
+            validation: 174
+        StackExchange_title_best_answer_academia:
+            test: 1606
+            total: 32137
+            train: 28925
+            validation: 1606
+        StackExchange_title_best_answer_ai:
+            test: 288
+            total: 5763
+            train: 5187
+            validation: 288
+        StackExchange_title_best_answer_android:
+            test: 1903
+            total: 38077
+            train: 34271
+            validation: 1903
+        StackExchange_title_best_answer_anime:
+            test: 506
+            total: 10131
+            train: 9119
+            validation: 506
+        StackExchange_title_best_answer_apple:
+            test: 4624
+            total: 92487
+            train: 83239
+            validation: 4624
+        StackExchange_title_best_answer_arduino:
+            test: 814
+            total: 16281
+            train: 14653
+            validation: 814
+        StackExchange_title_best_answer_askubuntu:
+            test: 13356
+            total: 267135
+            train: 240423
+            validation: 13356
+        StackExchange_title_best_answer_astronomy:
+            test: 454
+            total: 9086
+            train: 8178
+            validation: 454
+        StackExchange_title_best_answer_aviation:
+            test: 937
+            total: 18755
+            train: 16881
+            validation: 937
+        StackExchange_title_best_answer_avp:
+            test: 322
+            total: 6450
+            train: 5806
+            validation: 322
+        StackExchange_title_best_answer_beer:
+            test: 50
+            total: 1012
+            train: 912
+            validation: 50
+        StackExchange_title_best_answer_bicycles:
+            test: 785
+            total: 15708
+            train: 14138
+            validation: 785
+        StackExchange_title_best_answer_bioinformatics:
+            test: 156
+            total: 3135
+            train: 2823
+            validation: 156
+        StackExchange_title_best_answer_biology:
+            test: 963
+            total: 19277
+            train: 17351
+            validation: 963
+        StackExchange_title_best_answer_bitcoin:
+            test: 1123
+            total: 22474
+            train: 20228
+            validation: 1123
+        StackExchange_title_best_answer_blender:
+            test: 2707
+            total: 54153
+            train: 48739
+            validation: 2707
+        StackExchange_title_best_answer_boardgames:
+            test: 590
+            total: 11805
+            train: 10625
+            validation: 590
+        StackExchange_title_best_answer_bricks:
+            test: 176
+            total: 3530
+            train: 3178
+            validation: 176
+        StackExchange_title_best_answer_buddhism:
+            test: 339
+            total: 6787
+            train: 6109
+            validation: 339
+        StackExchange_title_best_answer_cardano:
+            test: 12
+            total: 248
+            train: 224
+            validation: 12
+        StackExchange_title_best_answer_chemistry:
+            test: 1353
+            total: 27061
+            train: 24355
+            validation: 1353
+        StackExchange_title_best_answer_chess:
+            test: 319
+            total: 6392
+            train: 5754
+            validation: 319
+        StackExchange_title_best_answer_chinese:
+            test: 432
+            total: 8646
+            train: 7782
+            validation: 432
+        StackExchange_title_best_answer_christianity:
+            test: 574
+            total: 11498
+            train: 10350
+            validation: 574
+        StackExchange_title_best_answer_civicrm:
+            test: 532
+            total: 10648
+            train: 9584
+            validation: 532
+        StackExchange_title_best_answer_codegolf:
+            test: 410
+            total: 8211
+            train: 7391
+            validation: 410
+        StackExchange_title_best_answer_codereview:
+            test: 2087
+            total: 41748
+            train: 37574
+            validation: 2087
+        StackExchange_title_best_answer_coffee:
+            test: 59
+            total: 1188
+            train: 1070
+            validation: 59
+        StackExchange_title_best_answer_cogsci:
+            test: 255
+            total: 5101
+            train: 4591
+            validation: 255
+        StackExchange_title_best_answer_computergraphics:
+            test: 115
+            total: 2306
+            train: 2076
+            validation: 115
+        StackExchange_title_best_answer_conlang:
+            test: 16
+            total: 334
+            train: 302
+            validation: 16
+        StackExchange_title_best_answer_cooking:
+            test: 1132
+            total: 22641
+            train: 20377
+            validation: 1132
+        StackExchange_title_best_answer_craftcms:
+            test: 561
+            total: 11236
+            train: 10114
+            validation: 561
+        StackExchange_title_best_answer_crafts:
+            test: 82
+            total: 1659
+            train: 1495
+            validation: 82
+        StackExchange_title_best_answer_crypto:
+            test: 970
+            total: 19404
+            train: 17464
+            validation: 970
+        StackExchange_title_best_answer_cs:
+            test: 1500
+            total: 30010
+            train: 27010
+            validation: 1500
+        StackExchange_title_best_answer_cseducators:
+            test: 45
+            total: 902
+            train: 812
+            validation: 45
+        StackExchange_title_best_answer_cstheory:
+            test: 387
+            total: 7742
+            train: 6968
+            validation: 387
+        StackExchange_title_best_answer_datascience:
+            test: 1025
+            total: 20503
+            train: 18453
+            validation: 1025
+        StackExchange_title_best_answer_dba:
+            test: 3572
+            total: 71449
+            train: 64305
+            validation: 3572
+        StackExchange_title_best_answer_devops:
+            test: 173
+            total: 3462
+            train: 3116
+            validation: 173
+        StackExchange_title_best_answer_diy:
+            test: 2644
+            total: 52896
+            train: 47608
+            validation: 2644
+        StackExchange_title_best_answer_drones:
+            test: 24
+            total: 496
+            train: 448
+            validation: 24
+        StackExchange_title_best_answer_drupal:
+            test: 3390
+            total: 67817
+            train: 61037
+            validation: 3390
+        StackExchange_title_best_answer_dsp:
+            test: 871
+            total: 17430
+            train: 15688
+            validation: 871
+        StackExchange_title_best_answer_earthscience:
+            test: 219
+            total: 4396
+            train: 3958
+            validation: 219
+        StackExchange_title_best_answer_ebooks:
+            test: 55
+            total: 1107
+            train: 997
+            validation: 55
+        StackExchange_title_best_answer_economics:
+            test: 442
+            total: 8844
+            train: 7960
+            validation: 442
+        StackExchange_title_best_answer_electronics:
+            test: 6474
+            total: 129494
+            train: 116546
+            validation: 6474
+        StackExchange_title_best_answer_elementaryos:
+            test: 295
+            total: 5917
+            train: 5327
+            validation: 295
+        StackExchange_title_best_answer_ell:
+            test: 3894
+            total: 77892
+            train: 70104
+            validation: 3894
+        StackExchange_title_best_answer_emacs:
+            test: 841
+            total: 16830
+            train: 15148
+            validation: 841
+        StackExchange_title_best_answer_engineering:
+            test: 432
+            total: 8649
+            train: 7785
+            validation: 432
+        StackExchange_title_best_answer_english:
+            test: 5032
+            total: 100640
+            train: 90576
+            validation: 5032
+        StackExchange_title_best_answer_eosio:
+            test: 97
+            total: 1940
+            train: 1746
+            validation: 97
+        StackExchange_title_best_answer_esperanto:
+            test: 73
+            total: 1466
+            train: 1320
+            validation: 73
+        StackExchange_title_best_answer_ethereum:
+            test: 1306
+            total: 26124
+            train: 23512
+            validation: 1306
+        StackExchange_title_best_answer_expatriates:
+            test: 245
+            total: 4913
+            train: 4423
+            validation: 245
+        StackExchange_title_best_answer_expressionengine:
+            test: 537
+            total: 10742
+            train: 9668
+            validation: 537
+        StackExchange_title_best_answer_fitness:
+            test: 414
+            total: 8297
+            train: 7469
+            validation: 414
+        StackExchange_title_best_answer_freelancing:
+            test: 83
+            total: 1663
+            train: 1497
+            validation: 83
+        StackExchange_title_best_answer_french:
+            test: 528
+            total: 10578
+            train: 9522
+            validation: 528
+        StackExchange_title_best_answer_gamedev:
+            test: 2007
+            total: 40154
+            train: 36140
+            validation: 2007
+        StackExchange_title_best_answer_gaming:
+            test: 4144
+            total: 82887
+            train: 74599
+            validation: 4144
+        StackExchange_title_best_answer_gardening:
+            test: 662
+            total: 13246
+            train: 11922
+            validation: 662
+        StackExchange_title_best_answer_genealogy:
+            test: 144
+            total: 2895
+            train: 2607
+            validation: 144
+        StackExchange_title_best_answer_german:
+            test: 686
+            total: 13733
+            train: 12361
+            validation: 686
+        StackExchange_title_best_answer_gis:
+            test: 5012
+            total: 100254
+            train: 90230
+            validation: 5012
+        StackExchange_title_best_answer_graphicdesign:
+            test: 1404
+            total: 28083
+            train: 25275
+            validation: 1404
+        StackExchange_title_best_answer_ham:
+            test: 175
+            total: 3501
+            train: 3151
+            validation: 175
+        StackExchange_title_best_answer_hardwarerecs:
+            test: 102
+            total: 2050
+            train: 1846
+            validation: 102
+        StackExchange_title_best_answer_health:
+            test: 224
+            total: 4494
+            train: 4046
+            validation: 224
+        StackExchange_title_best_answer_hermeneutics:
+            test: 475
+            total: 9516
+            train: 8566
+            validation: 475
+        StackExchange_title_best_answer_hinduism:
+            test: 449
+            total: 8999
+            train: 8101
+            validation: 449
+        StackExchange_title_best_answer_history:
+            test: 538
+            total: 10766
+            train: 9690
+            validation: 538
+        StackExchange_title_best_answer_homebrew:
+            test: 280
+            total: 5608
+            train: 5048
+            validation: 280
+        StackExchange_title_best_answer_hsm:
+            test: 125
+            total: 2517
+            train: 2267
+            validation: 125
+        StackExchange_title_best_answer_interpersonal:
+            test: 169
+            total: 3398
+            train: 3060
+            validation: 169
+        StackExchange_title_best_answer_iot:
+            test: 67
+            total: 1359
+            train: 1225
+            validation: 67
+        StackExchange_title_best_answer_iota:
+            test: 38
+            total: 775
+            train: 699
+            validation: 38
+        StackExchange_title_best_answer_islam:
+            test: 502
+            total: 10052
+            train: 9048
+            validation: 502
+        StackExchange_title_best_answer_italian:
+            test: 155
+            total: 3101
+            train: 2791
+            validation: 155
+        StackExchange_title_best_answer_ja:
+            test: 868
+            total: 17376
+            train: 15640
+            validation: 868
+        StackExchange_title_best_answer_japanese:
+            test: 1047
+            total: 20948
+            train: 18854
+            validation: 1047
+        StackExchange_title_best_answer_joomla:
+            test: 294
+            total: 5887
+            train: 5299
+            validation: 294
+        StackExchange_title_best_answer_judaism:
+            test: 1304
+            total: 26085
+            train: 23477
+            validation: 1304
+        StackExchange_title_best_answer_korean:
+            test: 70
+            total: 1406
+            train: 1266
+            validation: 70
+        StackExchange_title_best_answer_languagelearning:
+            test: 47
+            total: 948
+            train: 854
+            validation: 47
+        StackExchange_title_best_answer_latin:
+            test: 198
+            total: 3969
+            train: 3573
+            validation: 198
+        StackExchange_title_best_answer_law:
+            test: 806
+            total: 16133
+            train: 14521
+            validation: 806
+        StackExchange_title_best_answer_lifehacks:
+            test: 128
+            total: 2576
+            train: 2320
+            validation: 128
+        StackExchange_title_best_answer_linguistics:
+            test: 342
+            total: 6843
+            train: 6159
+            validation: 342
+        StackExchange_title_best_answer_literature:
+            test: 176
+            total: 3539
+            train: 3187
+            validation: 176
+        StackExchange_title_best_answer_magento:
+            test: 3962
+            total: 79241
+            train: 71317
+            validation: 3962
+        StackExchange_title_best_answer_martialarts:
+            test: 86
+            total: 1737
+            train: 1565
+            validation: 86
+        StackExchange_title_best_answer_materials:
+            test: 55
+            total: 1101
+            train: 991
+            validation: 55
+        StackExchange_title_best_answer_matheducators:
+            test: 135
+            total: 2706
+            train: 2436
+            validation: 135
+        StackExchange_title_best_answer_mathematica:
+            test: 2994
+            total: 59895
+            train: 53907
+            validation: 2994
+        StackExchange_title_best_answer_mathoverflow:
+            test: 4264
+            total: 85289
+            train: 76761
+            validation: 4264
+        StackExchange_title_best_answer_mechanics:
+            test: 930
+            total: 18613
+            train: 16753
+            validation: 930
+        StackExchange_title_best_answer_meta:
+            test: 50
+            total: 1000
+            train: 900
+            validation: 50
+        StackExchange_title_best_answer_moderators:
+            test: 25
+            total: 504
+            train: 454
+            validation: 25
+        StackExchange_title_best_answer_monero:
+            test: 175
+            total: 3508
+            train: 3158
+            validation: 175
+        StackExchange_title_best_answer_money:
+            test: 1470
+            total: 29404
+            train: 26464
+            validation: 1470
+        StackExchange_title_best_answer_movies:
+            test: 912
+            total: 18243
+            train: 16419
+            validation: 912
+        StackExchange_title_best_answer_music:
+            test: 996
+            total: 19936
+            train: 17944
+            validation: 996
+        StackExchange_title_best_answer_musicfans:
+            test: 121
+            total: 2431
+            train: 2189
+            validation: 121
+        StackExchange_title_best_answer_mythology:
+            test: 79
+            total: 1595
+            train: 1437
+            validation: 79
+        StackExchange_title_best_answer_networkengineering:
+            test: 629
+            total: 12590
+            train: 11332
+            validation: 629
+        StackExchange_title_best_answer_opendata:
+            test: 192
+            total: 3842
+            train: 3458
+            validation: 192
+        StackExchange_title_best_answer_opensource:
+            test: 161
+            total: 3221
+            train: 2899
+            validation: 161
+        StackExchange_title_best_answer_or:
+            test: 74
+            total: 1490
+            train: 1342
+            validation: 74
+        StackExchange_title_best_answer_outdoors:
+            test: 263
+            total: 5278
+            train: 4752
+            validation: 263
+        StackExchange_title_best_answer_parenting:
+            test: 299
+            total: 5998
+            train: 5400
+            validation: 299
+        StackExchange_title_best_answer_patents:
+            test: 178
+            total: 3573
+            train: 3217
+            validation: 178
+        StackExchange_title_best_answer_pets:
+            test: 307
+            total: 6156
+            train: 5542
+            validation: 307
+        StackExchange_title_best_answer_philosophy:
+            test: 655
+            total: 13114
+            train: 11804
+            validation: 655
+        StackExchange_title_best_answer_photo:
+            test: 1160
+            total: 23204
+            train: 20884
+            validation: 1160
+        StackExchange_title_best_answer_physics:
+            test: 7061
+            total: 141230
+            train: 127108
+            validation: 7061
+        StackExchange_title_best_answer_pm:
+            test: 271
+            total: 5435
+            train: 4893
+            validation: 271
+        StackExchange_title_best_answer_poker:
+            test: 83
+            total: 1665
+            train: 1499
+            validation: 83
+        StackExchange_title_best_answer_politics:
+            test: 552
+            total: 11047
+            train: 9943
+            validation: 552
+        StackExchange_title_best_answer_portuguese:
+            test: 98
+            total: 1964
+            train: 1768
+            validation: 98
+        StackExchange_title_best_answer_pt:
+            test: 5163
+            total: 103277
+            train: 92951
+            validation: 5163
+        StackExchange_title_best_answer_puzzling:
+            test: 872
+            total: 17448
+            train: 15704
+            validation: 872
+        StackExchange_title_best_answer_quant:
+            test: 646
+            total: 12933
+            train: 11641
+            validation: 646
+        StackExchange_title_best_answer_quantumcomputing:
+            test: 216
+            total: 4320
+            train: 3888
+            validation: 216
+        StackExchange_title_best_answer_raspberrypi:
+            test: 1207
+            total: 24143
+            train: 21729
+            validation: 1207
+        StackExchange_title_best_answer_retrocomputing:
+            test: 195
+            total: 3907
+            train: 3517
+            validation: 195
+        StackExchange_title_best_answer_reverseengineering:
+            test: 290
+            total: 5817
+            train: 5237
+            validation: 290
+        StackExchange_title_best_answer_robotics:
+            test: 232
+            total: 4648
+            train: 4184
+            validation: 232
+        StackExchange_title_best_answer_rpg:
+            test: 2021
+            total: 40435
+            train: 36393
+            validation: 2021
+        StackExchange_title_best_answer_ru:
+            test: 12664
+            total: 253289
+            train: 227961
+            validation: 12664
+        StackExchange_title_best_answer_rus:
+            test: 826
+            total: 16528
+            train: 14876
+            validation: 826
+        StackExchange_title_best_answer_russian:
+            test: 196
+            total: 3937
+            train: 3545
+            validation: 196
+        StackExchange_title_best_answer_salesforce:
+            test: 4363
+            total: 87272
+            train: 78546
+            validation: 4363
+        StackExchange_title_best_answer_scicomp:
+            test: 351
+            total: 7036
+            train: 6334
+            validation: 351
+        StackExchange_title_best_answer_scifi:
+            test: 2740
+            total: 54805
+            train: 49325
+            validation: 2740
+        StackExchange_title_best_answer_security:
+            test: 2567
+            total: 51355
+            train: 46221
+            validation: 2567
+        StackExchange_title_best_answer_serverfault:
+            test: 11925
+            total: 238507
+            train: 214657
+            validation: 11925
+        StackExchange_title_best_answer_sharepoint:
+            test: 4021
+            total: 80420
+            train: 72378
+            validation: 4021
+        StackExchange_title_best_answer_sitecore:
+            test: 391
+            total: 7838
+            train: 7056
+            validation: 391
+        StackExchange_title_best_answer_skeptics:
+            test: 407
+            total: 8145
+            train: 7331
+            validation: 407
+        StackExchange_title_best_answer_softwareengineering:
+            test: 2566
+            total: 51326
+            train: 46194
+            validation: 2566
+        StackExchange_title_best_answer_softwarerecs:
+            test: 588
+            total: 11761
+            train: 10585
+            validation: 588
+        StackExchange_title_best_answer_sound:
+            test: 415
+            total: 8303
+            train: 7473
+            validation: 415
+        StackExchange_title_best_answer_space:
+            test: 644
+            total: 12893
+            train: 11605
+            validation: 644
+        StackExchange_title_best_answer_spanish:
+            test: 383
+            total: 7675
+            train: 6909
+            validation: 383
+        StackExchange_title_best_answer_sports:
+            test: 235
+            total: 4707
+            train: 4237
+            validation: 235
+        StackExchange_title_best_answer_sqa:
+            test: 462
+            total: 9256
+            train: 8332
+            validation: 462
+        StackExchange_title_best_answer_stackapps:
+            test: 75
+            total: 1518
+            train: 1368
+            validation: 75
+        StackExchange_title_best_answer_stats:
+            test: 5783
+            total: 115679
+            train: 104113
+            validation: 5783
+        StackExchange_title_best_answer_stellar:
+            test: 53
+            total: 1078
+            train: 972
+            validation: 53
+        StackExchange_title_best_answer_superuser:
+            test: 17630
+            total: 352610
+            train: 317350
+            validation: 17630
+        StackExchange_title_best_answer_sustainability:
+            test: 83
+            total: 1674
+            train: 1508
+            validation: 83
+        StackExchange_title_best_answer_tex:
+            test: 8581
+            total: 171628
+            train: 154466
+            validation: 8581
+        StackExchange_title_best_answer_tezos:
+            test: 58
+            total: 1169
+            train: 1053
+            validation: 58
+        StackExchange_title_best_answer_tor:
+            test: 208
+            total: 4167
+            train: 3751
+            validation: 208
+        StackExchange_title_best_answer_travel:
+            test: 1826
+            total: 36533
+            train: 32881
+            validation: 1826
+        StackExchange_title_best_answer_tridion:
+            test: 295
+            total: 5907
+            train: 5317
+            validation: 295
+        StackExchange_title_best_answer_ukrainian:
+            test: 88
+            total: 1767
+            train: 1591
+            validation: 88
+        StackExchange_title_best_answer_unix:
+            test: 7770
+            total: 155414
+            train: 139874
+            validation: 7770
+        StackExchange_title_best_answer_ux:
+            test: 1445
+            total: 28901
+            train: 26011
+            validation: 1445
+        StackExchange_title_best_answer_vegetarianism:
+            test: 29
+            total: 585
+            train: 527
+            validation: 29
+        StackExchange_title_best_answer_vi:
+            test: 450
+            total: 9000
+            train: 8100
+            validation: 450
+        StackExchange_title_best_answer_webapps:
+            test: 1243
+            total: 24867
+            train: 22381
+            validation: 1243
+        StackExchange_title_best_answer_webmasters:
+            test: 1518
+            total: 30370
+            train: 27334
+            validation: 1518
+        StackExchange_title_best_answer_windowsphone:
+            test: 140
+            total: 2807
+            train: 2527
+            validation: 140
+        StackExchange_title_best_answer_woodworking:
+            test: 147
+            total: 2955
+            train: 2661
+            validation: 147
+        StackExchange_title_best_answer_wordpress:
+            test: 4181
+            total: 83621
+            train: 75259
+            validation: 4181
+        StackExchange_title_best_answer_workplace:
+            test: 1200
+            total: 24012
+            train: 21612
+            validation: 1200
+        StackExchange_title_best_answer_worldbuilding:
+            test: 1310
+            total: 26210
+            train: 23590
+            validation: 1310
+        StackExchange_title_best_answer_writers:
+            test: 493
+            total: 9867
+            train: 8881
+            validation: 493
+        StackExchange_title_body:
+            test: 287000
+            total: 5740000
+            train: 5166000
+            validation: 287000
+        StackExchange_titlebody_best_answer_3dprinting:
+            test: 174
+            total: 3488
+            train: 3140
+            validation: 174
+        StackExchange_titlebody_best_answer_academia:
+            test: 1606
+            total: 32137
+            train: 28925
+            validation: 1606
+        StackExchange_titlebody_best_answer_ai:
+            test: 288
+            total: 5763
+            train: 5187
+            validation: 288
+        StackExchange_titlebody_best_answer_android:
+            test: 1903
+            total: 38077
+            train: 34271
+            validation: 1903
+        StackExchange_titlebody_best_answer_anime:
+            test: 506
+            total: 10131
+            train: 9119
+            validation: 506
+        StackExchange_titlebody_best_answer_apple:
+            test: 4624
+            total: 92487
+            train: 83239
+            validation: 4624
+        StackExchange_titlebody_best_answer_arduino:
+            test: 814
+            total: 16281
+            train: 14653
+            validation: 814
+        StackExchange_titlebody_best_answer_askubuntu:
+            test: 13356
+            total: 267135
+            train: 240423
+            validation: 13356
+        StackExchange_titlebody_best_answer_astronomy:
+            test: 454
+            total: 9086
+            train: 8178
+            validation: 454
+        StackExchange_titlebody_best_answer_aviation:
+            test: 937
+            total: 18755
+            train: 16881
+            validation: 937
+        StackExchange_titlebody_best_answer_avp:
+            test: 322
+            total: 6450
+            train: 5806
+            validation: 322
+        StackExchange_titlebody_best_answer_beer:
+            test: 50
+            total: 1012
+            train: 912
+            validation: 50
+        StackExchange_titlebody_best_answer_bicycles:
+            test: 785
+            total: 15708
+            train: 14138
+            validation: 785
+        StackExchange_titlebody_best_answer_bioinformatics:
+            test: 156
+            total: 3135
+            train: 2823
+            validation: 156
+        StackExchange_titlebody_best_answer_biology:
+            test: 963
+            total: 19277
+            train: 17351
+            validation: 963
+        StackExchange_titlebody_best_answer_bitcoin:
+            test: 1123
+            total: 22474
+            train: 20228
+            validation: 1123
+        StackExchange_titlebody_best_answer_blender:
+            test: 2707
+            total: 54153
+            train: 48739
+            validation: 2707
+        StackExchange_titlebody_best_answer_boardgames:
+            test: 590
+            total: 11805
+            train: 10625
+            validation: 590
+        StackExchange_titlebody_best_answer_bricks:
+            test: 176
+            total: 3530
+            train: 3178
+            validation: 176
+        StackExchange_titlebody_best_answer_buddhism:
+            test: 339
+            total: 6787
+            train: 6109
+            validation: 339
+        StackExchange_titlebody_best_answer_cardano:
+            test: 12
+            total: 248
+            train: 224
+            validation: 12
+        StackExchange_titlebody_best_answer_chemistry:
+            test: 1353
+            total: 27061
+            train: 24355
+            validation: 1353
+        StackExchange_titlebody_best_answer_chess:
+            test: 319
+            total: 6392
+            train: 5754
+            validation: 319
+        StackExchange_titlebody_best_answer_chinese:
+            test: 432
+            total: 8646
+            train: 7782
+            validation: 432
+        StackExchange_titlebody_best_answer_christianity:
+            test: 574
+            total: 11498
+            train: 10350
+            validation: 574
+        StackExchange_titlebody_best_answer_civicrm:
+            test: 532
+            total: 10648
+            train: 9584
+            validation: 532
+        StackExchange_titlebody_best_answer_codegolf:
+            test: 410
+            total: 8211
+            train: 7391
+            validation: 410
+        StackExchange_titlebody_best_answer_codereview:
+            test: 2087
+            total: 41748
+            train: 37574
+            validation: 2087
+        StackExchange_titlebody_best_answer_coffee:
+            test: 59
+            total: 1188
+            train: 1070
+            validation: 59
+        StackExchange_titlebody_best_answer_cogsci:
+            test: 255
+            total: 5101
+            train: 4591
+            validation: 255
+        StackExchange_titlebody_best_answer_computergraphics:
+            test: 115
+            total: 2306
+            train: 2076
+            validation: 115
+        StackExchange_titlebody_best_answer_conlang:
+            test: 16
+            total: 334
+            train: 302
+            validation: 16
+        StackExchange_titlebody_best_answer_cooking:
+            test: 1132
+            total: 22641
+            train: 20377
+            validation: 1132
+        StackExchange_titlebody_best_answer_craftcms:
+            test: 561
+            total: 11236
+            train: 10114
+            validation: 561
+        StackExchange_titlebody_best_answer_crafts:
+            test: 82
+            total: 1659
+            train: 1495
+            validation: 82
+        StackExchange_titlebody_best_answer_crypto:
+            test: 970
+            total: 19404
+            train: 17464
+            validation: 970
+        StackExchange_titlebody_best_answer_cs:
+            test: 1500
+            total: 30010
+            train: 27010
+            validation: 1500
+        StackExchange_titlebody_best_answer_cseducators:
+            test: 45
+            total: 902
+            train: 812
+            validation: 45
+        StackExchange_titlebody_best_answer_cstheory:
+            test: 387
+            total: 7742
+            train: 6968
+            validation: 387
+        StackExchange_titlebody_best_answer_datascience:
+            test: 1025
+            total: 20503
+            train: 18453
+            validation: 1025
+        StackExchange_titlebody_best_answer_dba:
+            test: 3572
+            total: 71449
+            train: 64305
+            validation: 3572
+        StackExchange_titlebody_best_answer_devops:
+            test: 173
+            total: 3462
+            train: 3116
+            validation: 173
+        StackExchange_titlebody_best_answer_diy:
+            test: 2644
+            total: 52896
+            train: 47608
+            validation: 2644
+        StackExchange_titlebody_best_answer_drones:
+            test: 24
+            total: 496
+            train: 448
+            validation: 24
+        StackExchange_titlebody_best_answer_drupal:
+            test: 3390
+            total: 67817
+            train: 61037
+            validation: 3390
+        StackExchange_titlebody_best_answer_dsp:
+            test: 871
+            total: 17430
+            train: 15688
+            validation: 871
+        StackExchange_titlebody_best_answer_earthscience:
+            test: 219
+            total: 4396
+            train: 3958
+            validation: 219
+        StackExchange_titlebody_best_answer_ebooks:
+            test: 55
+            total: 1107
+            train: 997
+            validation: 55
+        StackExchange_titlebody_best_answer_economics:
+            test: 442
+            total: 8844
+            train: 7960
+            validation: 442
+        StackExchange_titlebody_best_answer_electronics:
+            test: 6474
+            total: 129494
+            train: 116546
+            validation: 6474
+        StackExchange_titlebody_best_answer_elementaryos:
+            test: 295
+            total: 5917
+            train: 5327
+            validation: 295
+        StackExchange_titlebody_best_answer_ell:
+            test: 3894
+            total: 77892
+            train: 70104
+            validation: 3894
+        StackExchange_titlebody_best_answer_emacs:
+            test: 841
+            total: 16830
+            train: 15148
+            validation: 841
+        StackExchange_titlebody_best_answer_engineering:
+            test: 432
+            total: 8649
+            train: 7785
+            validation: 432
+        StackExchange_titlebody_best_answer_english:
+            test: 5032
+            total: 100640
+            train: 90576
+            validation: 5032
+        StackExchange_titlebody_best_answer_eosio:
+            test: 97
+            total: 1940
+            train: 1746
+            validation: 97
+        StackExchange_titlebody_best_answer_esperanto:
+            test: 73
+            total: 1466
+            train: 1320
+            validation: 73
+        StackExchange_titlebody_best_answer_ethereum:
+            test: 1306
+            total: 26124
+            train: 23512
+            validation: 1306
+        StackExchange_titlebody_best_answer_expatriates:
+            test: 245
+            total: 4913
+            train: 4423
+            validation: 245
+        StackExchange_titlebody_best_answer_expressionengine:
+            test: 537
+            total: 10742
+            train: 9668
+            validation: 537
+        StackExchange_titlebody_best_answer_fitness:
+            test: 414
+            total: 8297
+            train: 7469
+            validation: 414
+        StackExchange_titlebody_best_answer_freelancing:
+            test: 83
+            total: 1663
+            train: 1497
+            validation: 83
+        StackExchange_titlebody_best_answer_french:
+            test: 528
+            total: 10578
+            train: 9522
+            validation: 528
+        StackExchange_titlebody_best_answer_gamedev:
+            test: 2007
+            total: 40154
+            train: 36140
+            validation: 2007
+        StackExchange_titlebody_best_answer_gaming:
+            test: 4144
+            total: 82887
+            train: 74599
+            validation: 4144
+        StackExchange_titlebody_best_answer_gardening:
+            test: 662
+            total: 13246
+            train: 11922
+            validation: 662
+        StackExchange_titlebody_best_answer_genealogy:
+            test: 144
+            total: 2895
+            train: 2607
+            validation: 144
+        StackExchange_titlebody_best_answer_german:
+            test: 686
+            total: 13733
+            train: 12361
+            validation: 686
+        StackExchange_titlebody_best_answer_gis:
+            test: 5012
+            total: 100254
+            train: 90230
+            validation: 5012
+        StackExchange_titlebody_best_answer_graphicdesign:
+            test: 1404
+            total: 28083
+            train: 25275
+            validation: 1404
+        StackExchange_titlebody_best_answer_ham:
+            test: 175
+            total: 3501
+            train: 3151
+            validation: 175
+        StackExchange_titlebody_best_answer_hardwarerecs:
+            test: 102
+            total: 2050
+            train: 1846
+            validation: 102
+        StackExchange_titlebody_best_answer_health:
+            test: 224
+            total: 4494
+            train: 4046
+            validation: 224
+        StackExchange_titlebody_best_answer_hermeneutics:
+            test: 475
+            total: 9516
+            train: 8566
+            validation: 475
+        StackExchange_titlebody_best_answer_hinduism:
+            test: 449
+            total: 8999
+            train: 8101
+            validation: 449
+        StackExchange_titlebody_best_answer_history:
+            test: 538
+            total: 10766
+            train: 9690
+            validation: 538
+        StackExchange_titlebody_best_answer_homebrew:
+            test: 280
+            total: 5608
+            train: 5048
+            validation: 280
+        StackExchange_titlebody_best_answer_hsm:
+            test: 125
+            total: 2517
+            train: 2267
+            validation: 125
+        StackExchange_titlebody_best_answer_interpersonal:
+            test: 169
+            total: 3398
+            train: 3060
+            validation: 169
+        StackExchange_titlebody_best_answer_iot:
+            test: 67
+            total: 1359
+            train: 1225
+            validation: 67
+        StackExchange_titlebody_best_answer_iota:
+            test: 38
+            total: 775
+            train: 699
+            validation: 38
+        StackExchange_titlebody_best_answer_islam:
+            test: 502
+            total: 10052
+            train: 9048
+            validation: 502
+        StackExchange_titlebody_best_answer_italian:
+            test: 155
+            total: 3101
+            train: 2791
+            validation: 155
+        StackExchange_titlebody_best_answer_ja:
+            test: 868
+            total: 17376
+            train: 15640
+            validation: 868
+        StackExchange_titlebody_best_answer_japanese:
+            test: 1047
+            total: 20948
+            train: 18854
+            validation: 1047
+        StackExchange_titlebody_best_answer_joomla:
+            test: 294
+            total: 5887
+            train: 5299
+            validation: 294
+        StackExchange_titlebody_best_answer_judaism:
+            test: 1304
+            total: 26085
+            train: 23477
+            validation: 1304
+        StackExchange_titlebody_best_answer_korean:
+            test: 70
+            total: 1406
+            train: 1266
+            validation: 70
+        StackExchange_titlebody_best_answer_languagelearning:
+            test: 47
+            total: 948
+            train: 854
+            validation: 47
+        StackExchange_titlebody_best_answer_latin:
+            test: 198
+            total: 3969
+            train: 3573
+            validation: 198
+        StackExchange_titlebody_best_answer_law:
+            test: 806
+            total: 16133
+            train: 14521
+            validation: 806
+        StackExchange_titlebody_best_answer_lifehacks:
+            test: 128
+            total: 2576
+            train: 2320
+            validation: 128
+        StackExchange_titlebody_best_answer_linguistics:
+            test: 342
+            total: 6843
+            train: 6159
+            validation: 342
+        StackExchange_titlebody_best_answer_literature:
+            test: 176
+            total: 3539
+            train: 3187
+            validation: 176
+        StackExchange_titlebody_best_answer_magento:
+            test: 3962
+            total: 79241
+            train: 71317
+            validation: 3962
+        StackExchange_titlebody_best_answer_martialarts:
+            test: 86
+            total: 1737
+            train: 1565
+            validation: 86
+        StackExchange_titlebody_best_answer_materials:
+            test: 55
+            total: 1101
+            train: 991
+            validation: 55
+        StackExchange_titlebody_best_answer_matheducators:
+            test: 135
+            total: 2706
+            train: 2436
+            validation: 135
+        StackExchange_titlebody_best_answer_mathematica:
+            test: 2994
+            total: 59895
+            train: 53907
+            validation: 2994
+        StackExchange_titlebody_best_answer_mathoverflow:
+            test: 4264
+            total: 85289
+            train: 76761
+            validation: 4264
+        StackExchange_titlebody_best_answer_mechanics:
+            test: 930
+            total: 18613
+            train: 16753
+            validation: 930
+        StackExchange_titlebody_best_answer_meta:
+            test: 50
+            total: 1000
+            train: 900
+            validation: 50
+        StackExchange_titlebody_best_answer_moderators:
+            test: 25
+            total: 504
+            train: 454
+            validation: 25
+        StackExchange_titlebody_best_answer_monero:
+            test: 175
+            total: 3508
+            train: 3158
+            validation: 175
+        StackExchange_titlebody_best_answer_money:
+            test: 1470
+            total: 29404
+            train: 26464
+            validation: 1470
+        StackExchange_titlebody_best_answer_movies:
+            test: 912
+            total: 18243
+            train: 16419
+            validation: 912
+        StackExchange_titlebody_best_answer_music:
+            test: 996
+            total: 19936
+            train: 17944
+            validation: 996
+        StackExchange_titlebody_best_answer_musicfans:
+            test: 121
+            total: 2431
+            train: 2189
+            validation: 121
+        StackExchange_titlebody_best_answer_mythology:
+            test: 79
+            total: 1595
+            train: 1437
+            validation: 79
+        StackExchange_titlebody_best_answer_networkengineering:
+            test: 629
+            total: 12590
+            train: 11332
+            validation: 629
+        StackExchange_titlebody_best_answer_opendata:
+            test: 192
+            total: 3842
+            train: 3458
+            validation: 192
+        StackExchange_titlebody_best_answer_opensource:
+            test: 161
+            total: 3221
+            train: 2899
+            validation: 161
+        StackExchange_titlebody_best_answer_or:
+            test: 74
+            total: 1490
+            train: 1342
+            validation: 74
+        StackExchange_titlebody_best_answer_outdoors:
+            test: 263
+            total: 5278
+            train: 4752
+            validation: 263
+        StackExchange_titlebody_best_answer_parenting:
+            test: 299
+            total: 5998
+            train: 5400
+            validation: 299
+        StackExchange_titlebody_best_answer_patents:
+            test: 178
+            total: 3573
+            train: 3217
+            validation: 178
+        StackExchange_titlebody_best_answer_pets:
+            test: 307
+            total: 6156
+            train: 5542
+            validation: 307
+        StackExchange_titlebody_best_answer_philosophy:
+            test: 655
+            total: 13114
+            train: 11804
+            validation: 655
+        StackExchange_titlebody_best_answer_photo:
+            test: 1160
+            total: 23204
+            train: 20884
+            validation: 1160
+        StackExchange_titlebody_best_answer_physics:
+            test: 7061
+            total: 141230
+            train: 127108
+            validation: 7061
+        StackExchange_titlebody_best_answer_pm:
+            test: 271
+            total: 5435
+            train: 4893
+            validation: 271
+        StackExchange_titlebody_best_answer_poker:
+            test: 83
+            total: 1665
+            train: 1499
+            validation: 83
+        StackExchange_titlebody_best_answer_politics:
+            test: 552
+            total: 11047
+            train: 9943
+            validation: 552
+        StackExchange_titlebody_best_answer_portuguese:
+            test: 98
+            total: 1964
+            train: 1768
+            validation: 98
+        StackExchange_titlebody_best_answer_pt:
+            test: 5163
+            total: 103277
+            train: 92951
+            validation: 5163
+        StackExchange_titlebody_best_answer_puzzling:
+            test: 872
+            total: 17448
+            train: 15704
+            validation: 872
+        StackExchange_titlebody_best_answer_quant:
+            test: 646
+            total: 12933
+            train: 11641
+            validation: 646
+        StackExchange_titlebody_best_answer_quantumcomputing:
+            test: 216
+            total: 4320
+            train: 3888
+            validation: 216
+        StackExchange_titlebody_best_answer_raspberrypi:
+            test: 1207
+            total: 24143
+            train: 21729
+            validation: 1207
+        StackExchange_titlebody_best_answer_retrocomputing:
+            test: 195
+            total: 3907
+            train: 3517
+            validation: 195
+        StackExchange_titlebody_best_answer_reverseengineering:
+            test: 290
+            total: 5817
+            train: 5237
+            validation: 290
+        StackExchange_titlebody_best_answer_robotics:
+            test: 232
+            total: 4648
+            train: 4184
+            validation: 232
+        StackExchange_titlebody_best_answer_rpg:
+            test: 2021
+            total: 40435
+            train: 36393
+            validation: 2021
+        StackExchange_titlebody_best_answer_ru:
+            test: 12664
+            total: 253289
+            train: 227961
+            validation: 12664
+        StackExchange_titlebody_best_answer_rus:
+            test: 826
+            total: 16528
+            train: 14876
+            validation: 826
+        StackExchange_titlebody_best_answer_russian:
+            test: 196
+            total: 3937
+            train: 3545
+            validation: 196
+        StackExchange_titlebody_best_answer_salesforce:
+            test: 4363
+            total: 87272
+            train: 78546
+            validation: 4363
+        StackExchange_titlebody_best_answer_scicomp:
+            test: 351
+            total: 7036
+            train: 6334
+            validation: 351
+        StackExchange_titlebody_best_answer_scifi:
+            test: 2740
+            total: 54805
+            train: 49325
+            validation: 2740
+        StackExchange_titlebody_best_answer_security:
+            test: 2567
+            total: 51355
+            train: 46221
+            validation: 2567
+        StackExchange_titlebody_best_answer_serverfault:
+            test: 11925
+            total: 238507
+            train: 214657
+            validation: 11925
+        StackExchange_titlebody_best_answer_sharepoint:
+            test: 4021
+            total: 80420
+            train: 72378
+            validation: 4021
+        StackExchange_titlebody_best_answer_sitecore:
+            test: 391
+            total: 7838
+            train: 7056
+            validation: 391
+        StackExchange_titlebody_best_answer_skeptics:
+            test: 407
+            total: 8145
+            train: 7331
+            validation: 407
+        StackExchange_titlebody_best_answer_softwareengineering:
+            test: 2566
+            total: 51326
+            train: 46194
+            validation: 2566
+        StackExchange_titlebody_best_answer_softwarerecs:
+            test: 588
+            total: 11761
+            train: 10585
+            validation: 588
+        StackExchange_titlebody_best_answer_sound:
+            test: 415
+            total: 8303
+            train: 7473
+            validation: 415
+        StackExchange_titlebody_best_answer_space:
+            test: 644
+            total: 12893
+            train: 11605
+            validation: 644
+        StackExchange_titlebody_best_answer_spanish:
+            test: 383
+            total: 7675
+            train: 6909
+            validation: 383
+        StackExchange_titlebody_best_answer_sports:
+            test: 235
+            total: 4707
+            train: 4237
+            validation: 235
+        StackExchange_titlebody_best_answer_sqa:
+            test: 462
+            total: 9256
+            train: 8332
+            validation: 462
+        StackExchange_titlebody_best_answer_stackapps:
+            test: 75
+            total: 1518
+            train: 1368
+            validation: 75
+        StackExchange_titlebody_best_answer_stats:
+            test: 5783
+            total: 115679
+            train: 104113
+            validation: 5783
+        StackExchange_titlebody_best_answer_stellar:
+            test: 53
+            total: 1078
+            train: 972
+            validation: 53
+        StackExchange_titlebody_best_answer_superuser:
+            test: 17630
+            total: 352610
+            train: 317350
+            validation: 17630
+        StackExchange_titlebody_best_answer_sustainability:
+            test: 83
+            total: 1674
+            train: 1508
+            validation: 83
+        StackExchange_titlebody_best_answer_tex:
+            test: 8581
+            total: 171628
+            train: 154466
+            validation: 8581
+        StackExchange_titlebody_best_answer_tezos:
+            test: 58
+            total: 1169
+            train: 1053
+            validation: 58
+        StackExchange_titlebody_best_answer_tor:
+            test: 208
+            total: 4167
+            train: 3751
+            validation: 208
+        StackExchange_titlebody_best_answer_travel:
+            test: 1826
+            total: 36533
+            train: 32881
+            validation: 1826
+        StackExchange_titlebody_best_answer_tridion:
+            test: 295
+            total: 5907
+            train: 5317
+            validation: 295
+        StackExchange_titlebody_best_answer_ukrainian:
+            test: 88
+            total: 1767
+            train: 1591
+            validation: 88
+        StackExchange_titlebody_best_answer_unix:
+            test: 7770
+            total: 155414
+            train: 139874
+            validation: 7770
+        StackExchange_titlebody_best_answer_ux:
+            test: 1445
+            total: 28901
+            train: 26011
+            validation: 1445
+        StackExchange_titlebody_best_answer_vegetarianism:
+            test: 29
+            total: 585
+            train: 527
+            validation: 29
+        StackExchange_titlebody_best_answer_vi:
+            test: 450
+            total: 9000
+            train: 8100
+            validation: 450
+        StackExchange_titlebody_best_answer_webapps:
+            test: 1243
+            total: 24867
+            train: 22381
+            validation: 1243
+        StackExchange_titlebody_best_answer_webmasters:
+            test: 1518
+            total: 30370
+            train: 27334
+            validation: 1518
+        StackExchange_titlebody_best_answer_windowsphone:
+            test: 140
+            total: 2807
+            train: 2527
+            validation: 140
+        StackExchange_titlebody_best_answer_woodworking:
+            test: 147
+            total: 2955
+            train: 2661
+            validation: 147
+        StackExchange_titlebody_best_answer_wordpress:
+            test: 4181
+            total: 83621
+            train: 75259
+            validation: 4181
+        StackExchange_titlebody_best_answer_workplace:
+            test: 1200
+            total: 24012
+            train: 21612
+            validation: 1200
+        StackExchange_titlebody_best_answer_worldbuilding:
+            test: 1310
+            total: 26210
+            train: 23590
+            validation: 1310
+        StackExchange_titlebody_best_answer_writers:
+            test: 493
+            total: 9867
+            train: 8881
+            validation: 493
+        WikiAnswers:
+            test: 160000
+            total: 3200000
+            train: 2880000
+            validation: 160000
+        agnews:
+            test: 57887
+            total: 1157745
+            train: 1041971
+            validation: 57887
+        cc_news:
+            test: 35412
+            total: 708241
+            train: 637417
+            validation: 35412
+        cnn_dailymail:
+            test: 15598
+            total: 311971
+            train: 280775
+            validation: 15598
+        eli5:
+            test: 16273
+            total: 325475
+            train: 292929
+            validation: 16273
+        msmacro_triplet:
+            test: 680000
+            total: 13600000
+            train: 12240000
+            validation: 680000
+        nli_for_simcse_triplet:
+            test: 95000
+            total: 1900000
+            train: 1710000
+            validation: 95000
+        npr:
+            test: 29719
+            total: 594384
+            train: 534946
+            validation: 29719
+        quora_dup_triplet:
+            test: 139500
+            total: 2790000
+            train: 2511000
+            validation: 139500
+        sentence_compression:
+            test: 9000
+            total: 180000
+            train: 162000
+            validation: 9000
+        squad_v2:
+            test: 7109
+            total: 142192
+            train: 127974
+            validation: 7109
+        trivia_qa_triplet:
+            test: 2645000
+            total: 52900000
+            train: 47610000
+            validation: 2645000
+        wikipedia:
+            test: 320000
+            total: 6400000
+            train: 5760000
+            validation: 320000
+        xsum:
+            test: 11335
+            total: 226711
+            train: 204041
+            validation: 11335
+        yahoo_title_answers:
+            test: 60000
+            total: 1200000
+            train: 1080000
+            validation: 60000
+ddp_backend:
+    value: null
+ddp_broadcast_buffers:
+    value: false
+ddp_bucket_cap_mb:
+    value: null
+ddp_find_unused_parameters:
+    value: null
+ddp_timeout:
+    value: 1800
+debug:
+    value: []
+deepspeed:
+    value: null
+disable_tqdm:
+    value: false
+dispatch_batches:
+    value: null
+do_eval:
+    value: true
+do_predict:
+    value: false
+do_train:
+    value: false
+eval_accumulation_steps:
+    value: null
+eval_and_save_steps:
+    value: 1000
+eval_delay:
+    value: 0
+eval_do_concat_batches:
+    value: true
+eval_on_start:
+    value: false
+eval_steps:
+    value: 1000
+eval_strategy:
+    value: steps
+eval_use_gather_object:
+    value: false
+evaluation_strategy:
+    value: null
+fp16:
+    value: false
+fp16_backend:
+    value: auto
+fp16_full_eval:
+    value: false
+fp16_opt_level:
+    value: O1
+fsdp:
+    value: []
+fsdp_config:
+    value:
+        min_num_params: 0
+        xla: false
+        xla_fsdp_grad_ckpt: false
+        xla_fsdp_v2: false
+fsdp_min_num_params:
+    value: 0
+fsdp_transformer_layer_cls_to_wrap:
+    value: null
+full_determinism:
+    value: false
+gpu_available:
+    value: true
+gpu_count:
+    value: 2
+gpu_names:
+    value:
+        - NVIDIA A100 80GB PCIe
+        - NVIDIA A100 80GB PCIe
+gradient_accumulation_steps:
+    value: 32
+gradient_checkpointing:
+    value: false
+gradient_checkpointing_kwargs:
+    value: null
+greater_is_better:
+    value: null
+group_by_length:
+    value: false
+half_precision_backend:
+    value: auto
+hub_always_push:
+    value: false
+hub_model_id:
+    value: null
+hub_private_repo:
+    value: null
+hub_strategy:
+    value: every_save
+hub_token:
+    value: <HUB_TOKEN>
+ignore_data_skip:
+    value: true
+include_for_metrics:
+    value: []
+include_inputs_for_metrics:
+    value: false
+include_num_input_tokens_seen:
+    value: false
+include_tokens_per_second:
+    value: false
+jit_mode_eval:
+    value: false
+label_names:
+    value: null
+label_smoothing_factor:
+    value: 0
+learning_rate:
+    value: 0.0001
+length_column_name:
+    value: length
+load_best_model_at_end:
+    value: false
+local_rank:
+    value: 0
+log_level:
+    value: passive
+log_level_replica:
+    value: warning
+log_on_each_node:
+    value: true
+logging_dir:
+    value: /rhome/sawale/indus_traning/sentense_transformers/model_exploration/tmp_models/nrows_None__nsrc_None/timestamp_20250505_16-10-36/indus-sde-v0.2/checkpoints/runs/Jun05_18-18-25_matrix101.nsstc.uah.edu
+logging_first_step:
+    value: false
+logging_nan_inf_filter:
+    value: true
+logging_steps:
+    value: 1000
+logging_strategy:
+    value: steps
+lr_max (initial_lr):
+    value: 0.0001
+lr_min_custom:
+    value: 5e-06
+lr_scheduler_custom_enabled:
+    value: true
+lr_scheduler_type:
+    value: linear
+max_datapoints_per_src_for_eval:
+    value: 20
+max_grad_norm:
+    value: 1
+max_steps:
+    value: -1
+metric_for_best_model:
+    value: null
+model_max_len:
+    value: 1024
+model_name:
+    value: nasa-impact/indus-sde-v0.2
+mp_parameters:
+    value: ""
+multi_dataset_batch_sampler:
+    value: proportional
+neftune_noise_alpha:
+    value: null
+no_cuda:
+    value: false
+nrows:
+    value: null
+num_train_epochs:
+    value: 1
+optim:
+    value: adamw_torch
+optim_args:
+    value: null
+optim_target_modules:
+    value: null
+output_dir:
+    value: /rhome/sawale/indus_traning/sentense_transformers/model_exploration/tmp_models/nrows_None__nsrc_None/timestamp_20250505_16-10-36/indus-sde-v0.2/checkpoints
+overwrite_output_dir:
+    value: false
+past_index:
+    value: -1
+per_device_eval_batch_size:
+    value: 16
+per_device_train_batch_size:
+    value: 16
+per_gpu_eval_batch_size:
+    value: null
+per_gpu_train_batch_size:
+    value: null
+prediction_loss_only:
+    value: true
+pretokenization:
+    value: false
+prompts:
+    value: null
+push_to_hub:
+    value: false
+push_to_hub_model_id:
+    value: null
+push_to_hub_organization:
+    value: null
+push_to_hub_token:
+    value: <PUSH_TO_HUB_TOKEN>
+ray_scope:
+    value: last
+remove_unused_columns:
+    value: true
+report_to:
+    value:
+        - wandb
+restore_callback_states_from_checkpoint:
+    value: false
+resume_from_checkpoint:
+    value: null
+run_name:
+    value: /rhome/sawale/indus_traning/sentense_transformers/model_exploration/tmp_models/nrows_None__nsrc_None/timestamp_20250505_16-10-36/indus-sde-v0.2/checkpoints
+save_on_each_node:
+    value: false
+save_only_model:
+    value: false
+save_safetensors:
+    value: true
+save_steps:
+    value: 1000
+save_strategy:
+    value: steps
+save_total_limit:
+    value: 2
+seed:
+    value: 42
+skip_memory_metrics:
+    value: true
+split_batches:
+    value: null
+test_data_points:
+    value: 10787931
+test_frac:
+    value: 0.05
+tf32:
+    value: null
+torch_compile:
+    value: false
+torch_compile_backend:
+    value: null
+torch_compile_mode:
+    value: null
+torch_empty_cache_steps:
+    value: null
+torchdynamo:
+    value: null
+total_datapoints:
+    value: 215755046
+tp_size:
+    value: 0
+tpu_metrics_debug:
+    value: false
+tpu_num_cores:
+    value: null
+train_data_points:
+    value: 194179380
+use_cpu:
+    value: false
+use_ipex:
+    value: false
+use_legacy_prediction_loop:
+    value: false
+use_liger_kernel:
+    value: false
+use_mps_device:
+    value: false
+val_data_points:
+    value: 10787735
+val_frac:
+    value: 0.05
+warmup_ratio:
+    value: 0.1
+warmup_steps:
+    value: 0
+weight_decay:
+    value: 0
