@@ -4,6 +4,7 @@ import datetime
 import os
 import pickle
 import random
+import sys
 import time
 from typing import Dict, List, Optional, Union
 
@@ -163,8 +164,7 @@ def build_dataset_configs_s2(N_DATA_SRC=None) -> dict:
                 "positive": ex["positives"]["docs"][0],
             },
             "loss": MultipleNegativesRankingLoss,
-            "weight": 41
-            / 2.66,  # Optional weight for sampling this datadet when using WeightedBatchSampler; if not specified, defaults to 1.0
+            "weight": 41 / 2.66,
         },
         "s2orc_title_abstract": {
             "args": {

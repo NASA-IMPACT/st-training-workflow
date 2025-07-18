@@ -434,7 +434,7 @@ class MultiGPUNanoBEIREvaluator(NanoBEIREvaluator):
             queries=queries_dict,
             corpus=corpus_dict,
             relevant_docs=qrels_dict,
-            name=human_readable_name,
+            name=f"nanobeir__{human_readable_name}__evaluator",
             **ir_evaluator_kwargs,
         )
 
