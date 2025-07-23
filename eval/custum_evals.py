@@ -1,3 +1,4 @@
+import asyncio
 import csv
 import heapq
 import json
@@ -8,6 +9,7 @@ from contextlib import nullcontext
 import numpy as np
 import pandas as pd
 import torch
+from gen_openai_emb import generate_openai_embeddings
 from sentence_transformers import util
 from sentence_transformers.evaluation import (
     InformationRetrievalEvaluator,
@@ -77,6 +79,7 @@ class MultiGPUInformationRetrievalEvaluator(InformationRetrievalEvaluator):
         output_path: str | None = None,
         corpus_df: pd.DataFrame | None = None,  # new parameter
         query_df: pd.DataFrame | None = None,  # new parameter
+        query_prompt_str: str | None = None,  # new parameter
     ) -> dict[str, float]:
         if corpus_model is None:
             corpus_model = model
@@ -101,7 +104,9 @@ class MultiGPUInformationRetrievalEvaluator(InformationRetrievalEvaluator):
                 chunk_size=self.encode_chunk_size,
                 show_progress_bar=True,
                 prompt_name=self.query_prompt_name,
-                prompt=self.query_prompt,
+                prompt=query_prompt_str
+                if query_prompt_str is not None
+                else self.query_prompt,
             )
         else:
             # filter and reorder the embeddings to only include the queries we have
@@ -434,7 +439,7 @@ class MultiGPUNanoBEIREvaluator(NanoBEIREvaluator):
             queries=queries_dict,
             corpus=corpus_dict,
             relevant_docs=qrels_dict,
-            name=f"nanobeir__{human_readable_name}__evaluator",
+            name=f"nanobeir__{human_readable_name}____evaluator",
             **ir_evaluator_kwargs,
         )
 
@@ -474,26 +479,38 @@ class MultiGPUNanoBEIREvaluator(NanoBEIREvaluator):
             desc="Evaluating datasets",
             disable=not self.show_progress_bar,
         ):
-            logger.info(f"Evaluating {evaluator.name}")
+            print(f"Evaluating {evaluator.name}")
             if corpus_dfs and query_dfs:
                 evaluation = evaluator(
                     model,
                     output_path,
                     epoch,
                     steps,
-                    corpus_df=corpus_dfs.get(evaluator.name),
-                    query_df=query_dfs.get(evaluator.name),
+                    corpus_df=corpus_dfs.get(evaluator.name.split("__")[1])
+                    if corpus_dfs
+                    else None,
+                    query_df=query_dfs.get(evaluator.name.split("__")[1])
+                    if query_dfs
+                    else None,
                 )
             else:
                 evaluation = evaluator(model, output_path, epoch, steps)
             for k in evaluation:
                 if self.truncate_dim:
-                    dataset, _, metric = k.split("_", maxsplit=2)
+                    # dataset, _, metric = k.split("_", maxsplit=2)
+                    nanobeir_name, dataset_name, subset_name, rest_part = k.split("__")
+                    evaluator_name, _, metric = rest_part.split("_", maxsplit=2)
                 else:
-                    dataset, metric = k.split("_", maxsplit=1)
+                    # lets parse the key correctly
+                    nanobeir_name, dataset_name, subset_name, rest_part = k.split("__")
+                    evaluator_name, metric = rest_part.split("_", maxsplit=1)
+
                 if metric not in per_metric_results:
                     per_metric_results[metric] = []
-                per_dataset_results[dataset + "_" + metric] = evaluation[k]
+                # per_dataset_results[dataset + "_" + metric] = evaluation[k]
+                per_dataset_results[
+                    f"{nanobeir_name}__{dataset_name}__{subset_name}__{evaluator_name}_{metric}"
+                ] = evaluation[k]
                 per_metric_results[metric].append(evaluation[k])
 
         agg_results = {}
@@ -590,3 +607,94 @@ class MultiGPUNanoBEIREvaluator(NanoBEIREvaluator):
         per_dataset_results.update(agg_results)
 
         return per_dataset_results
+
+
+def get_embedding_for_dataset(
+    dataset_config,
+    embedding_path,
+    dataset_name,
+    model_name,
+    subset=None,
+    data_file=None,
+):
+    """
+    Function to get embeddings for a specific dataset.
+    If the embeddings do not exist, it generates them.
+    """
+
+    base_path = (
+        os.path.join(embedding_path, dataset_name, subset)
+        if subset is not None
+        else os.path.join(embedding_path, dataset_name)
+    )
+    # if it is nanobeir then subset is None
+
+    print(f"Base Path: {base_path}")
+    corpus_path = os.path.join(base_path, "corpus_embeddings.parquet")
+    queries_path = os.path.join(base_path, "queries_embeddings.parquet")
+
+    if (not os.path.exists(corpus_path)) or (not os.path.exists(queries_path)):
+        dataset_input_path = None
+
+        # Either path is not None eg. nasa sde v1, nasa sde v2, nasa smd ir (which is hf path)
+        if dataset_config.get("path") is not None:
+            dataset_input_path = dataset_config["path"]
+        # either paths is not None like Nanobeir but path is non
+        elif dataset_config.get("paths") is not None:
+            # need to be updated
+            dataset_input_path = dataset_config[
+                "paths"
+            ]  # there are multiple paths for different subsets
+        # either path needs to be local like beir and also has subsets
+        elif dataset_config.get("dataset_cache_path") is not None:
+            dataset_input_path = os.path.join(
+                dataset_config["dataset_cache_path"],
+                subset,
+            )
+
+        if isinstance(dataset_input_path, dict):
+            # when there is paths
+            # genererate embedding for all subsets save it all and return dfs inside a dict
+            corpus_dfs = {}
+            queries_dfs = {}
+
+            for name, path in dataset_input_path.items():
+                corpus_path = os.path.join(base_path, name, "corpus_embeddings.parquet")
+                queries_path = os.path.join(
+                    base_path,
+                    name,
+                    "queries_embeddings.parquet",
+                )
+
+                if (os.path.exists(corpus_path)) and (os.path.exists(queries_path)):
+                    print("Found existing embeddings for", name)
+                    corpus_df = pd.read_parquet(corpus_path)
+                    queries_df = pd.read_parquet(queries_path)
+
+                else:
+                    corpus_df, queries_df = asyncio.run(
+                        generate_openai_embeddings(
+                            path,
+                            os.path.join(base_path, name),
+                            model=model_name,
+                        ),
+                    )
+
+                corpus_dfs[name] = corpus_df
+                queries_dfs[name] = queries_df
+            return corpus_dfs, queries_dfs
+        else:
+            corpus_df, queries_df = asyncio.run(
+                generate_openai_embeddings(
+                    dataset_input_path,
+                    base_path,
+                    model=model_name,
+                ),
+            )
+
+            return corpus_df, queries_df
+
+    else:
+        corpus_df = pd.read_parquet(corpus_path)
+        queries_df = pd.read_parquet(queries_path)
+        return corpus_df, queries_df

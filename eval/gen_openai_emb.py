@@ -16,7 +16,6 @@ def get_data(
     dataset_path: str,
     corpus_split: str = "train",
     queries_split: str = "train",
-    relevant_docs_split: str = "test",
 ):
     """Loads corpus, queries, and relevant documents from the dataset."""
 
@@ -31,7 +30,6 @@ def get_data(
             data_files="queries.jsonl",
             split=queries_split,
         )
-        relevant_docs_dataset = load_dataset(dataset_path, split=relevant_docs_split)
     except Exception as e:
         corpus_dataset = load_dataset(dataset_path, name="corpus", split=corpus_split)
         queries_dataset = load_dataset(
@@ -39,40 +37,22 @@ def get_data(
             name="queries",
             split=queries_split,
         )
-        relevant_docs_dataset = load_dataset(
-            dataset_path,
-            name="qrels",
-            split=relevant_docs_split,
-        )
 
     corpus = {row["_id"]: row["text"] for row in corpus_dataset}
     queries = {row["_id"]: row["text"] for row in queries_dataset}
 
-    relevant_docs_data = (
-        relevant_docs_dataset.to_pandas()
-        .groupby("query-id")["corpus-id"]
-        .apply(set)
-        .to_dict()
-    )
-    relevant_docs_data = {
-        str(k): {str(item) for item in v} for k, v in relevant_docs_data.items()
-    }
-
-    return corpus, queries, relevant_docs_data
+    return corpus, queries
 
 
 # %%
 # --- Configuration ---
-MODEL_NAME = "text-embedding-3-small"
+# MODEL_NAME = "text-embedding-3-small"
 # MODEL_NAME = "text-embedding-3-large"
-MAX_TOKENS = 8192
-
-# --- Initialize Tokenizer ---
-tokenizer = tiktoken.encoding_for_model(MODEL_NAME)
 
 
-def truncate_text(text: str, max_tokens: int = MAX_TOKENS) -> str:
+def truncate_text(text: str, model_name, max_tokens: int = 8192) -> str:
     """Truncates a text string to a maximum number of tokens."""
+    tokenizer = tiktoken.encoding_for_model(model_name)
     tokens = tokenizer.encode(text)
     if len(tokens) > max_tokens:
         truncated_tokens = tokens[:max_tokens]
@@ -112,7 +92,7 @@ async def _create_embedding_df_async(
                 results_dict[batch_index] = []  # Store empty result for empty batch
                 return
 
-            truncated_batch = [truncate_text(text) for text in cleaned_batch]
+            truncated_batch = [truncate_text(text, model) for text in cleaned_batch]
 
             response = await client.embeddings.create(
                 input=truncated_batch,
@@ -156,7 +136,7 @@ async def _create_embedding_df_async(
 async def gen_openai_emb_async(
     corpus: dict,
     queries: dict,
-    model: str = MODEL_NAME,
+    model: str,
     batch_size: int = 100,
     concurrency_limit: int = 5,  # Max concurrent requests
 ):
@@ -196,79 +176,28 @@ async def gen_openai_emb_async(
     return corpus_embeddings_df, query_embeddings_df
 
 
+# the main function to run the embedding generation
 # %%
-async def main(
+async def generate_openai_embeddings(
     dataset_path: str,
     output_dir: str,
-    model: str = MODEL_NAME,
+    model: str,
     corpus_split: str = "train",
     queries_split: str = "train",
-    relevant_docs_split: str = "test",
 ):
     """Main function to run the data loading and embedding generation."""
-    # dataset_path = "nasa-impact/nasa-sde-IR-benchmark-sample-v1"
-    corpus, queries, relevant_docs_data = get_data(
+    print(f"Generating OpenAI embeddings... using {model} for {dataset_path} dataset")
+    # dataset_path is either a hf or local path
+    corpus, queries = get_data(
         dataset_path,
         corpus_split,
         queries_split,
-        relevant_docs_split,
     )
 
-    # Sample a small subset for testing
-    # corpus_sample = {k: corpus[k] for k in list(corpus.keys())[:1000]}
-    # queries_sample = {k: queries[k] for k in list(queries.keys())[:1000]}
+    corpus_df, queries_df = await gen_openai_emb_async(corpus, queries, model)
 
-    corpus_df, queries_df = await gen_openai_emb_async(corpus, queries)
-
-    output_dir = os.path.join(output_dir, MODEL_NAME, dataset_path.split("/")[-1])
     os.makedirs(output_dir, exist_ok=True)
     corpus_df.to_parquet(os.path.join(output_dir, "corpus_embeddings.parquet"))
     queries_df.to_parquet(os.path.join(output_dir, "queries_embeddings.parquet"))
 
     return corpus_df, queries_df
-
-
-if __name__ == "__main__":
-    # Load the dataset
-    output_dir = (
-        "/rhome/sawale/indus_traning/sentense_transformers/eval/openai_emb_cache/"
-    )
-    # dataset_path = "nasa-impact/nasa-sde-IR-benchmark-sample-v1"
-    # corpus_df, queries_df = asyncio.run(main(dataset_path, output_dir))
-
-    # dataset_path = "nasa-impact/nasa-sde-IR-benchmark-sample-v2"
-    # corpus_df, queries_df = asyncio.run(main(dataset_path, output_dir))
-
-    # dataset_path = "nasa-impact/nasa-smd-IR-benchmark"
-    # corpus_df, queries_df = asyncio.run(main(dataset_path, output_dir))
-
-    # for nanobert
-    output_dir = "/rhome/sawale/indus_traning/sentense_transformers/eval/openai_emb_cache/nanobeir"
-    dataset_names = [
-        "zeta-alpha-ai/NanoClimateFEVER",
-        "zeta-alpha-ai/NanoDBPedia",
-        "zeta-alpha-ai/NanoFEVER",
-        "zeta-alpha-ai/NanoFiQA2018",  # issue
-        "zeta-alpha-ai/NanoHotpotQA",
-        "zeta-alpha-ai/NanoMSMARCO",
-        "zeta-alpha-ai/NanoNFCorpus",
-        "zeta-alpha-ai/NanoNQ",
-        "zeta-alpha-ai/NanoQuoraRetrieval",
-        "zeta-alpha-ai/NanoSCIDOCS",  # issue
-        "zeta-alpha-ai/NanoArguAna",
-        "zeta-alpha-ai/NanoSciFact",
-        "zeta-alpha-ai/NanoTouche2020",
-    ]
-
-    for dataset_path in dataset_names:
-        print(f"Processing dataset: {dataset_path}")
-        corpus_df, queries_df = asyncio.run(
-            main(
-                dataset_path,
-                output_dir,
-                corpus_split="train",
-                queries_split="train",
-                relevant_docs_split="train",
-            ),
-        )
-        print(f"Processed {dataset_path} successfully.")
