@@ -3,7 +3,7 @@
 #SBATCH --mail-user=sa0812@uah.edu
 #SBATCH --job-name=llm_slurm_conda       # Job name
 #SBATCH --nodes=1                        # Number of nodes
-#SBATCH --gres=gpu:a100:2                # Request 2 GPUs (A100)
+#SBATCH --gres=gpu:a100:2                # Request 1 GPU (A100)
 #SBATCH --cpus-per-task=16               # Number of CPU cores per task
 #SBATCH --mem=100G                        # Total memory
 #SBATCH --output=slurm_logs/%j_%x.out           # Standard output
@@ -91,7 +91,10 @@ echo ">>>>>> test python file"
 #     st_trainer_ddp_hf.py --batch_size 16 --gradient_accumulation_steps 32 --lr 1e-4 --resume_checkpoint_path /rhome/sawale/indus_traning/sentense_transformers/model_exploration/tmp_models/nrows_None__nsrc_None/timestamp_20250505_16-10-36/indus-sde-v0.2/checkpoints/checkpoint-169000 --resume_run_id 9olox5mz
 
 
-srun python eval_runner_beir.py
+srun python main_eval.py --dataset_name nanobeir
+
+
+srun python main_eval.py --dataset_name nasa_smd_ir
 
 
 echo "<<<<<< test python file"

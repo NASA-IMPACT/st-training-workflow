@@ -3,6 +3,7 @@ import json
 import os
 import pathlib
 from collections import defaultdict
+from string import Template
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -17,6 +18,7 @@ from custum_evals import (
 )
 from datasets import load_dataset
 from sentence_transformers import SentenceTransformer
+from sentence_transformers import models as s_models
 
 parser = argparse.ArgumentParser(description="Sentence Transformer Training Config")
 
@@ -31,6 +33,7 @@ parser.add_argument(
         "nasa_sde_ir_v2",
         "nasa_sde_ir_v3",
         "nasa_smd_ir",
+        "shortform-fullform",
     ],
 )
 parser.add_argument("--ks", nargs="*", default=[1, 3, 5, 10])
@@ -47,7 +50,7 @@ parser.add_argument(
 parser.add_argument(
     "--desired_metric_types",
     nargs="+",
-    default=["mrr", "accuracy"],
+    default=["mrr", "ndcg"],
     help="A list of metrics to plot (e.g., mrr, accuracy, ndcg, precision, recall, map).",
 )
 
@@ -107,6 +110,31 @@ models = {
         "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/"
         "model-rpv7vnpd:v1/checkpoint-13500",
         "color": "#bcbd22",
+    },
+    "indus-sde-st-v0.2_peach-night-57_42k": {
+        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/model-rpv7vnpd:v1/checkpoint-42000",
+        "color": "#2affdb",
+    },
+    "indus-sde-st-v0.2_polar-monkey-61_20k": {
+        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/model-6hjbp1bx:v1/checkpoint-20000",
+        "color": "#ffbb78",
+    },
+    "indus-sde-st-v0.2_polar-monkey-61_30k": {
+        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/model-6hjbp1bx:v1/checkpoint-30000",
+        "color": "#33ff77",
+    },
+    "nasa-smd-ibm-st-v2(ft_ads_sde)": {
+        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/model-xfpc778s:v1/checkpoint-1492",
+        "color": "#6622ee",
+    },
+    "deploy_model_v2": {
+        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/deploy_model_v2",
+        "color": "#6e9944",
+    },
+    "deployed_model_v1_slow_token_cls_pool": {
+        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/deploy_model_v1",
+        "color": "#cc4444",
+        "pooling_mode": "cls",  # This is the special flag
     },
     # "Qwen3-Embedding-0.6B": {
     #     "path": "Qwen/Qwen3-Embedding-0.6B",
@@ -182,6 +210,74 @@ dataset_config = {
             "qrels/search_term-document~SDE_general_v3.tsv",
             "qrels/title-description~CMR.tsv",
             "qrels/title-description~PDS.tsv",
+        ],
+        "data_files_colors": [
+            "#1f77b4",  # question-answer~SDE_general_v2.tsv
+            "#ff7f0e",  # question-answer~SDE_general_v3.tsv
+            "#2ca02c",  # search_term-document~CMR.tsv
+            "#d62728",  # search_term-document~PDS.tsv
+            "#9467bd",  # search_term-document~SDE_general_v2.tsv
+            "#8c564b",  # search_term-document~SDE_general_v3.tsv
+            "#e377c2",  # title-description~CMR.tsv
+            "#7f7f7f",  # title-description~PDS.tsv
+        ],
+    },
+    "shortform-fullform": {
+        "path": "/rhome/sawale/indus_traning/sentense_transformers/data/short_full_form_pairs",
+        # "path": "/rhome/sawale/indus_traning/sentense_transformers/data/short_full_form_pairs_v1",
+        "data_files": [
+            "qrels/chrono_units.tsv",
+            "qrels/data_format.tsv",
+            "qrels/instruments.tsv",
+            "qrels/locations.tsv",
+            "qrels/measurement_name.tsv",
+            "qrels/mime_type.tsv",
+            "qrels/platforms.tsv",
+            "qrels/projects.tsv",
+            "qrels/providers.tsv",
+            "qrels/ru_content_type.tsv",
+            "qrels/sciencekeywords.tsv",
+            "qrels/temporal_resolution_range.tsv",
+            "qrels/pim_astronomy_and_astrophysics_flight_missions.tsv",
+            "qrels/pim_beyond_earth_missions.tsv",
+            "qrels/pim_ceos_instruments.tsv",
+            "qrels/pim_ceos_missions.tsv",
+            "qrels/pim_gcmd_instruments.tsv",
+            "qrels/pim_gcmd_platforms.tsv",
+            "qrels/pim_high_energy_astrophysics_missions.tsv",
+            "qrels/pim_mast_missions.tsv",
+            "qrels/pim_nasa_heliophysics_sun-planet_missions.tsv",
+            "qrels/pim_pds_mission_archive_page.tsv",
+            "qrels/pim_planetary_missions_beyond_earth_orbit.tsv",
+            "qrels/pim_spase_instruments.tsv",
+            "qrels/pim_spase_observatories.tsv",
+        ],
+        "data_files_colors": [
+            "#1f77b4",  # qrels/chrono_units.tsv
+            "#ff7f0e",  # qrels/data_format.tsv
+            "#2ca02c",  # qrels/instruments.tsv
+            "#d62728",  # qrels/locations.tsv
+            "#9467bd",  # qrels/measurement_name.tsv
+            "#8c564b",  # qrels/mime_type.tsv
+            "#e377c2",  # qrels/platforms.tsv
+            "#7f7f7f",  # qrels/projects.tsv
+            "#bcbd22",  # qrels/providers.tsv
+            "#17becf",  # qrels/ru_content_type.tsv
+            "#aec7e8",  # qrels/sciencekeywords.tsv
+            "#ffbb78",  # qrels/temporal_resolution_range.tsv
+            "#98df8a",  # qrels/pim_astronomy_and_astrophysics_flight_missions.tsv
+            "#c5b0d5",  # qrels/pim_beyond_earth_missions.tsv
+            "#c49c94",  # qrels/pim_ceos_instruments.tsv
+            "#f7b6d2",  # qrels/pim_ceos_missions.tsv
+            "#c7c7c7",  # qrels/pim_gcmd_instruments.tsv
+            "#dbdb8d",  # qrels/pim_gcmd_platforms.tsv
+            "#9edae5",  # qrels/pim_high_energy_astrophysics_missions.tsv
+            "#6b6ecf",  # qrels/pim_mast_missions.tsv
+            "#9c9ede",  # qrels/pim_nasa_heliophysics_sun-planet_missions.tsv
+            "#bd9e39",  # qrels/pim_pds_mission_archive_page.tsv
+            "#e7ba52",  # qrels/pim_planetary_missions_beyond_earth_orbit.tsv
+            "#e7cb94",  # qrels/pim_spase_instruments.tsv
+            "#843c39",  # qrels/pim_spase_observatories.tsv
         ],
     },
 }
@@ -344,7 +440,7 @@ def get_evaluator(
             encode_batch_size=batch_size,
         )
 
-    elif dataset_name.lower() == "nasa_sde_ir_v3":
+    elif dataset_name.lower() in ["nasa_sde_ir_v3", "shortform-fullform"]:
         evaluator = MultiGPUInformationRetrievalEvaluator(
             queries=queries,
             corpus=corpus,
@@ -383,33 +479,87 @@ def get_evaluator(
     return evaluator
 
 
-def add_mean_metrics(all_results):
+def add_mean_metrics(all_results, query_counts, mean_basis="subset"):
     for model_name in all_results:
         metric_names = set(
             [i.split("_")[-1] for i in list(all_results[model_name].keys())],
         )
-        subset_names = set(
-            [
-                i.split("__")[1]
-                for i in all_results[model_name]
-                if "mean" not in i.split("__")[1]
-            ],
-        )
+
+        if mean_basis == "subset":
+            mean_basis_names = set(
+                [
+                    i.split("__")[1]
+                    for i in all_results[model_name]
+                    if "mean" not in i.split("__")[1]
+                ],
+            )
+            key_name = (
+                "${dataset_name}__${mean_basis_name}____evaluator_cosine_${metric}"
+            )
+            result_key_name = (
+                "${dataset_name}__${mean_type}____evaluator_cosine_${metric}"
+            )
+        elif mean_basis == "data_file":
+            mean_basis_names = set(
+                [
+                    i.split("__")[2]
+                    for i in all_results[model_name]
+                    if "mean" not in i.split("__")[2]
+                ],
+            )
+            key_name = (
+                "${dataset_name}____${mean_basis_name}__evaluator_cosine_${metric}"
+            )
+            result_key_name = (
+                "${dataset_name}____${mean_type}__evaluator_cosine_${metric}"
+            )
 
         mean_result = {}
+        weighted_mean_result = {}
 
         # Calculate the mean for each metric
         for metric in metric_names:
             values = []
-            for subset in subset_names:
-                key_name = f"{dataset_name}__{subset}____evaluator_cosine_{metric}"
-                values.append(all_results[model_name][key_name])
+            weighted_values = []
+            weights = []
+            for mean_basis_name in mean_basis_names:
+                _key_name = Template(key_name).substitute(
+                    dataset_name=dataset_name,
+                    mean_basis_name=mean_basis_name,
+                    metric=metric,
+                )
+                values.append(all_results[model_name][_key_name])
+                weight_key = "__".join(_key_name.split("__")[:2])
+                weight = query_counts.get(weight_key, 1)
+                weighted_values.append(values[-1] * weight)
+                weights.append(weight)
 
-            mean_result[f"{dataset_name}__mean____evaluator_cosine_{metric}"] = sum(
+            _result_key_name = Template(result_key_name).substitute(
+                dataset_name=dataset_name,
+                mean_type="mean",
+                metric=metric,
+            )
+            mean_result[_result_key_name] = sum(
                 values,
             ) / (len(values) if len(values) > 0 else 1)
 
-        all_results[model_name] = {**all_results[model_name], **mean_result}
+            if sum(weights) > 0:
+                __result_key_name = Template(result_key_name).substitute(
+                    dataset_name=dataset_name,
+                    mean_type="weightedmean",
+                    metric=metric,
+                )
+                weighted_mean_result[__result_key_name] = sum(
+                    weighted_values,
+                ) / sum(weights)
+            else:
+                weighted_mean_result[__result_key_name] = 0.0
+
+        all_results[model_name] = {
+            **all_results[model_name],
+            **mean_result,
+            **weighted_mean_result,
+        }
 
 
 def check_if_eval_already_exists(all_results, model_name, subset=None, data_file=None):
@@ -440,29 +590,36 @@ def pre_compute_corpus_embedding(
     all_results,
     dataset_config,
 ):
-    data_file = dataset_config[dataset_name].get("data_files", [None])[0]
-    n_data_files = len(data_file)
+    if dataset_name.lower() in ["nanobeir"]:
+        print(
+            f"Skipping pre-computation of corpus embeddings for {dataset_name} as it is not supported.",
+        )
+        return {}
+    data_file = dataset_config[dataset_name].get("data_files", [None])
+    # n_data_files = len(data_file)
+
+    relevant_docs_split = "train" if any([i is not None for i in data_file]) else "test"
     corpus, _q, _ = get_dataset(
         dataset_name,
         subset,
-        relevant_docs_split="train" if n_data_files > 1 else "test",
-        data_file=None,
+        relevant_docs_split=relevant_docs_split,
+        data_file=data_file[0] if data_file[0] is not None else None,
     )
 
     corpus_texts = list(corpus.values())
     corpus_pre_computed_embeddings = {}
     for model_name, model_info in models.items():
 
-        if check_if_eval_already_exists(all_results, model_name, subset, data_file):
+        if check_if_eval_already_exists(all_results, model_name, subset, data_file[0]):
             print(
-                f"Model {model_name} with the subset {subset} and data_file {data_file} already evaluated. Skipping...Preembedding of corpus",
+                f"Model {model_name} with the subset {subset} and data_file {data_file[0]} already evaluated. Skipping...Preembedding of corpus",
             )
             continue
 
         print(
             f"Pre-computing corpus embeddings for model: {model_name}, subset: {subset}",
         )
-        model = SentenceTransformer(model_info["path"])
+        model = load_model_with_proper_pooling(model_name, model_info)
 
         pool = model.start_multi_process_pool()
 
@@ -482,15 +639,53 @@ def pre_compute_corpus_embedding(
     return corpus_pre_computed_embeddings
 
 
-def evaluate():
-    # check if the json_output_path file exists
-    # if it does, load it to all_results else initilize an empty dictionary
-    if os.path.exists(json_output_path):
-        # load the json
-        with open(json_output_path, "r", encoding="utf-8") as f:
-            all_results = json.load(f)
+def load_json_if_exists(path):
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
+def generate_query_counts_for_nanobeir(dataset_config, dataset_name):
+    query_counts = {}
+
+    for d_name, path in dataset_config[dataset_name]["paths"].items():
+        relevant_docs_data = load_dataset(
+            path,
+            split="train",
+            name="qrels",
+        )
+        query_counts[f"{dataset_name}__{d_name}__"] = len(relevant_docs_data)
+
+    return query_counts
+
+
+def load_model_with_proper_pooling(model_name, model_info):
+    if "pooling_mode" in model_info:
+        print(
+            f"Loading {model_name} with custom '{model_info['pooling_mode']}' pooling...",
+        )
+        # 1. Load the base transformer model
+        transformer_layer = s_models.Transformer(model_info["path"])
+        # 2. Create a pooling layer with the specified mode
+        pooling_layer = s_models.Pooling(
+            word_embedding_dimension=transformer_layer.get_word_embedding_dimension(),
+            pooling_mode=model_info["pooling_mode"],  # Use the mode from our config
+        )
+        # 3. Create the final SentenceTransformer model from these two modules
+        model = SentenceTransformer(modules=[transformer_layer, pooling_layer])
+
     else:
-        all_results = {}
+        # This is the default behavior for all other models
+        print(f"Loading {model_name} with default pooling...")
+        model = SentenceTransformer(model_info["path"])
+
+    return model
+
+
+def evaluate():
+    all_results = load_json_if_exists(json_output_path)
+    query_counts = {}
 
     subsets = dataset_config[dataset_name].get("subsets", [None])
     for subset in subsets:
@@ -513,6 +708,10 @@ def evaluate():
                 relevant_docs_split="test" if data_file is None else "train",
                 data_file=data_file,
             )
+            if relevant_docs is not None:
+                query_counts[
+                    f"{dataset_name}__{subset if subset is not None else ''}__{data_file if data_file is not None else ''}"
+                ] = len(relevant_docs)
             evaluator = get_evaluator(
                 dataset_name,
                 queries,
@@ -536,7 +735,7 @@ def evaluate():
                         f"Model {model_name} with the subset {subset} and data_file {data_file} already evaluated. Skipping...",
                     )
                     continue
-                model = SentenceTransformer(model_info["path"])
+                model = load_model_with_proper_pooling(model_name, model_info)
                 results = evaluator(
                     model,
                     query_prompt_str=model_info.get("query_prompt", None),
@@ -606,16 +805,22 @@ def evaluate():
                     all_results[embedding_name] = {}
                 all_results[embedding_name] = {**all_results[embedding_name], **results}
 
+    if len(dataset_config[dataset_name].get("paths", [])) > 1:
+        # computing query counts for different paths
+        query_counts = generate_query_counts_for_nanobeir(dataset_config, dataset_name)
+
     if len(subsets) > 1 or len(dataset_config[dataset_name].get("paths", [])) > 1:
         # need to add a mean of metrics from different subsets of different models
-        add_mean_metrics(all_results)
+        add_mean_metrics(all_results, query_counts, mean_basis="subset")
+    elif len(dataset_config[dataset_name].get("data_files", [])) > 1:
+        # need to add a mean of metrics from different data_files of different models
+        add_mean_metrics(all_results, query_counts, mean_basis="data_file")
 
     with open(json_output_path, "w", encoding="utf-8") as f:
         json.dump(all_results, f, ensure_ascii=False, indent=4)
 
 
-def plot_results(json_output_path):
-    print("Plotting results...")
+def convert_json_output_to_df(json_output_path):
     if not os.path.exists(json_output_path):
         print(
             f"JSON output path {json_output_path} does not exist. Please run the evaluation first.",
@@ -651,6 +856,14 @@ def plot_results(json_output_path):
 
     # Create a pandas DataFrame
     df = pd.DataFrame(records)
+
+    return df
+
+
+def plot_results(json_output_path):
+    print("Plotting results...")
+    # Create a pandas DataFrame
+    df = convert_json_output_to_df(json_output_path)
 
     # filter the DataFrame to include only the desired metric types
     df = df[df["metric"].isin(desired_metric_types)]
@@ -714,7 +927,7 @@ def plot_results(json_output_path):
                     0.5,
                     -0.2,
                 ),  # Center the legend horizontally, move it down
-                ncol=5,  # Adjust number of columns to fit your models (image has 10)
+                ncol=6,  # Adjust number of columns to fit your models (image has 10)
                 title=None,
                 frameon=False,
             )
@@ -748,7 +961,113 @@ def plot_results(json_output_path):
             )
 
 
+def plot_data_files_based_eval(json_output_path):
+    print("Plotting data files based evaluation...")
+    df = convert_json_output_to_df(json_output_path)
+
+    # filter the DataFrame to include only the desired metric types
+    df = df[df["metric"].isin(desired_metric_types)]
+
+    # ~ removing data_file which is mean
+    df = df[~df["data_file"].str.contains("mean")]
+
+    if df["data_file"].nunique() <= 1:
+        # there is no multiple data files to plot
+        return
+
+    output_dir_plots_ = os.path.join(
+        output_dir_plots,
+        dataset_name,
+        "data_files_based_eval",
+    )
+    os.makedirs(output_dir_plots_, exist_ok=True)
+
+    dataset_color_palette = {
+        name: color
+        for name, color in zip(
+            dataset_config[dataset_name].get("data_files", [None]),
+            dataset_config[dataset_name].get("data_files_colors", [None]),
+        )
+    }
+    # loop through differnt models: each model will have its own plot
+    for model_name in df["model"].unique():
+        df_model = df[df["model"] == model_name]
+
+        sorted_data_file_names = sorted(df_model["data_file"].unique())
+
+        # Create the bar plot
+        g = sns.catplot(
+            data=df_model,
+            x="k",
+            y="value",
+            hue="data_file",
+            hue_order=sorted_data_file_names,
+            col="metric",
+            kind="bar",
+            col_wrap=2,
+            sharey=False,
+            height=5,
+            aspect=2,
+            legend_out=True,
+            palette=dataset_color_palette,
+        )
+
+        # Customize subplot titles and labels
+        g.set_titles("Metric: {col_name}")
+        g.set_axis_labels("K Value", "Score")
+        g.despine(left=True)
+
+        # Add value labels on top of each bar
+        for ax in g.axes.flat:
+            for p in ax.patches:
+                value = f"{p.get_height():.2f}"
+                x = p.get_x() + p.get_width() / 2
+                y = p.get_height()
+                ax.annotate(
+                    value,
+                    (x, y),
+                    ha="center",
+                    va="center",
+                    xytext=(0, 5),
+                    textcoords="offset points",
+                    fontsize=9,
+                )
+
+        # 1. Move the legend to be centered below the plot
+        sns.move_legend(
+            g,
+            "lower center",
+            bbox_to_anchor=(
+                0.5,
+                -0.2,
+            ),  # Center the legend horizontally, move it down
+            ncol=6,  # Adjust number of columns to fit your models (image has 10)
+            title="Data Files",
+            frameon=False,
+        )
+
+        # 2. Add the main title for the figure
+        title = f"Performance of {model_name} at K-Value On {dataset_name}"
+        g.fig.suptitle(
+            title,
+            fontsize=16,  # Optional: Adjust font size
+        )
+
+        # 3. Use tight_layout to automatically adjust spacing and center the title
+        # The rect parameter makes space for the suptitle at the top
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
+
+        # 4. Save the figure
+        # The bbox_inches="tight" argument is crucial for including the legend
+        plt.savefig(
+            f"{output_dir_plots_}/{model_name}_performance_plots.png",
+            bbox_inches="tight",
+            dpi=300,  # Optional: Increase image resolution
+        )
+
+
 if __name__ == "__main__":
     if not just_plot:
         evaluate()
     plot_results(json_output_path)
+    plot_data_files_based_eval(json_output_path)
