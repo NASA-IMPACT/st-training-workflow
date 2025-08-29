@@ -121,7 +121,41 @@ def build_dataset_configs_s3(N_DATA_SRC=None) -> dict:
     """
     Define all your dataset mappings and losses for stage 3 data.
     """
-    return None
+    base = {
+        "nasa-science-function-code-docstring": {
+            "args": {"path": "nasa-impact/nasa-science-function-code-docstring"},
+            "map_fn": lambda ex: {"anchor": ex["code"], "positive": ex["original_docstring"]},
+            "loss": MultipleNegativesRankingLoss,
+            "weight": 1,  
+        },
+
+        "nasa-science-class-code-docstring": {
+            "args": {"path": "nasa-impact/nasa-science-class-code-docstring"},
+            "map_fn": lambda ex: {"anchor": ex["code"], "positive": ex["original_docstring"]},
+            "loss": MultipleNegativesRankingLoss,
+            "weight": 1,  
+        },
+        "nasa-science-function-code-identifier": {
+            "args": {"path": "nasa-impact/nasa-science-function-code-identifier"},
+            "map_fn": lambda ex: {"anchor": ex["code"], "positive": ex["identifier"]},
+            "loss": MultipleNegativesRankingLoss,
+            "weight": 1,  
+        },
+        "nasa-science-class-code-identifier": {
+            "args": {"path": "nasa-impact/nasa-science-class-code-identifier"},
+            "map_fn": lambda ex: {"anchor": ex["code"], "positive": ex["identifier"]},
+            "loss": MultipleNegativesRankingLoss,
+            "weight": 1,  
+        },
+
+        
+    }
+
+    if N_DATA_SRC is not None:
+        n_src = min(len(base), N_DATA_SRC)
+        base = {k: v for i, (k, v) in enumerate(base.items()) if i < n_src}
+
+    return base
 
 
 def build_dataset_configs_s2(N_DATA_SRC=None) -> dict:
