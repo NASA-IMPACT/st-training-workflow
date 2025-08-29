@@ -562,7 +562,7 @@ if __name__ == "__main__":
             assert RESUME_RUN_ID is not None
             wandb.init(
                 entity="impact-ibm-collaboration",
-                project="nasa-indus-sde-s2",
+                project="nasa-indus-sde-s3",
                 mode=WB_MODE,
                 id=RESUME_RUN_ID,
                 resume="must",
@@ -573,7 +573,7 @@ if __name__ == "__main__":
         else:
             wandb.init(
                 entity="impact-ibm-collaboration",
-                project="nasa-indus-sde-s2",
+                project="nasa-indus-sde-s3",
                 mode=WB_MODE,
                 # group="ddp_run",
                 # job_type="train",

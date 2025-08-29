@@ -117,6 +117,12 @@ def get_all_data_subset(name: str, path: str, s1: str, s2: str, loss_fn) -> dict
         }
     return out
 
+def build_dataset_configs_s3(N_DATA_SRC=None) -> dict:
+    """
+    Define all your dataset mappings and losses for stage 3 data.
+    """
+    return None
+
 
 def build_dataset_configs_s2(N_DATA_SRC=None) -> dict:
     """
@@ -208,6 +214,13 @@ def build_dataset_configs_s2(N_DATA_SRC=None) -> dict:
             "loss": MultipleNegativesRankingLoss,
             "weight": 41 / 5,
         },
+        "stage1_pairs": {
+            "args": {"path": "stage1/stage1_pairs"},
+            "map_fn": lambda ex: {"anchor": ex["query"], "positive": ex["context"]},
+            "loss": MultipleNegativesRankingLoss,
+            "weight": 1,  #sample from stage1
+        },
+
         # "pmc": {
         #     "args": {"path": "../data_prep/raw/pmc_open_access.py", "split": "train"},
         #     "map_fn": lambda ex: {
