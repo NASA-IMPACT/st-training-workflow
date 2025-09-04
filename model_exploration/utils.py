@@ -148,18 +148,16 @@ def build_dataset_configs_s3(N_DATA_SRC=None) -> dict:
             "weight": 1,  
         },
 
-        #TODO fix columns?
         "the-vault-function": {
             "args": {"path": "Fsoft-AIC/the-vault-function"},
-            "map_fn": lambda ex: {"anchor": ex["code"], "positive": ex["identifier"]},
+            "map_fn": lambda ex: {"anchor": ex["code"], "positive": ex["original_docstring"]},
             "loss": MultipleNegativesRankingLoss,
             "weight": 1,  
         },
 
-        #TODO fix columns?
         "the-vault-class": {
             "args": {"path": "Fsoft-AIC/the-vault-class"},
-            "map_fn": lambda ex: {"anchor": ex["code"], "positive": ex["identifier"]},
+            "map_fn": lambda ex: {"anchor": ex["code"], "positive": ex["original_docstring"]},
             "loss": MultipleNegativesRankingLoss,
             "weight": 1,  
         },
