@@ -1,0 +1,8 @@
+{
+    "s3_twilight-forest-14_(granite_small_r2)": {
+        "codesearchnet_testset_benchmark_v0.1__None": 94.66045045852661
+    },
+    "jina-code-embeddings-0.5b": {
+        "codesearchnet_testset_benchmark_v0.1__None": 967.2032895088196
+    }
+}

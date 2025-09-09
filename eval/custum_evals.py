@@ -35,6 +35,23 @@ from tqdm import tqdm, trange
 logger = logging.getLogger(__name__)
 
 
+class UBinarySentenceTransformer(SentenceTransformer):
+    """
+    A SentenceTransformer model that always outputs binary embeddings.
+    """
+
+    def encode(self, sentences, *args, **kwargs) -> Tensor:
+        """
+        Overrides the default encode method to enforce binary precision.
+        """
+        # Set the desired arguments for binary embeddings
+        kwargs["precision"] = "ubinary"
+        kwargs["convert_to_tensor"] = True
+
+        # Call the original encode method from the parent class (SentenceTransformer)
+        return super().encode(sentences, *args, **kwargs)
+
+
 # Define a dummy placeholder for the model card data attribute
 class DummyModelCardData:
     def set_evaluation_metrics(self, *args, **kwargs):
@@ -50,9 +67,9 @@ class DummyModel:
     pre-computed embeddings.
     """
 
-    def __init__(self):
-        self.similarity = util.cos_sim
-        self.similarity_fn_name = "cosine"
+    def __init__(self, similarity=util.cos_sim, similarity_fn_name="cosine"):
+        self.similarity = similarity
+        self.similarity_fn_name = similarity_fn_name
         self.model_card_data = DummyModelCardData()
 
     def start_multi_process_pool(self, *args, **kwargs):
@@ -95,7 +112,7 @@ class MultiGPUInformationRetrievalEvaluator(InformationRetrievalEvaluator):
         pool = model.start_multi_process_pool()
         # Compute embedding for the queries
         if query_df is None:
-            logger.info(f"Computing embeddings for queries")
+            logger.info("Computing embeddings for queries")
             print("Computing query embeddings")
             query_embeddings = model.encode(
                 self.queries,
@@ -118,7 +135,7 @@ class MultiGPUInformationRetrievalEvaluator(InformationRetrievalEvaluator):
             queries_result_list[name] = [[] for _ in range(len(query_embeddings))]
 
         if (corpus_embeddings is None) and (corpus_df is None):
-            logger.info(f"Computing embeddings for corpus")
+            logger.info("Computing embeddings for corpus")
             print("Computing corpus embeddings")
             corpus_embeddings = model.encode(
                 self.corpus,
@@ -240,12 +257,12 @@ class MultiGPUInformationRetrievalEvaluator(InformationRetrievalEvaluator):
         logger.info(f"Queries: {len(self.queries)}")
         logger.info(f"Corpus: {len(self.corpus)}\n")
 
-        # Compute scores
-        for query_itr in range(len(queries_result_list["cosine"])):
-            try:
-                query_id = self.queries_ids[query_itr]
-            except IndexError:
-                print("query_itr: ", query_itr)
+        # # Compute scores
+        # for query_itr in range(len(queries_result_list["cosine"])):
+        #     try:
+        #         query_id = self.queries_ids[query_itr]
+        #     except IndexError:
+        #         print("query_itr: ", query_itr)
 
         scores = {
             name: self.compute_metrics(queries_result_list[name])
@@ -698,3 +715,43 @@ def get_embedding_for_dataset(
         corpus_df = pd.read_parquet(corpus_path)
         queries_df = pd.read_parquet(queries_path)
         return corpus_df, queries_df
+
+
+def hamming_similarity_from_distance(a: Tensor, b: Tensor) -> Tensor:
+    """
+    Computes Hamming similarity based on Hamming distance for packed binary tensors.
+    This version is more efficient as it avoids unpacking the original tensors.
+    Similarity = Total Bits - Differing Bits.
+    """
+
+    if isinstance(a, np.ndarray):
+        a = torch.from_numpy(a)
+    if isinstance(b, np.ndarray):
+        b = torch.from_numpy(b)
+
+    # Ensure tensors are on the CPU and are of type uint8 for bitwise operations
+    a_cpu = a.cpu().to(torch.uint8)
+    b_cpu = b.cpu().to(torch.uint8)
+
+    # 1. Use broadcasting to efficiently perform a bitwise XOR.
+    # This finds the differing bits between all pairs of vectors.
+    # The resulting tensor `differences` has a shape of:
+    # (num_queries, num_corpus_docs, embedding_dim_in_bytes)
+    differences = a_cpu.unsqueeze(1) ^ b_cpu.unsqueeze(0)
+
+    # 2. Count the number of set bits (1s) to get the Hamming distance.
+    # We convert the tensor of byte differences to a NumPy array,
+    # unpack the bits for each byte, and sum them up. This is an
+    # efficient way to perform a "population count".
+    # The result is a matrix of distances with shape: (num_queries, num_corpus_docs)
+    hamming_distance = np.unpackbits(differences.numpy(), axis=2).sum(axis=2)
+
+    # 3. The total number of bits is the embedding dimension.
+    # We get this by taking the number of bytes and multiplying by 8.
+    vector_length = a_cpu.shape[1] * 8
+
+    # 4. Convert Hamming distance to Hamming similarity.
+    hamming_similarity = vector_length - hamming_distance
+
+    # 5. Return the result as a PyTorch float tensor.
+    return torch.from_numpy(hamming_similarity).float()

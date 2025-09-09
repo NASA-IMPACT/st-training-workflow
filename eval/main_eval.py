@@ -2,9 +2,11 @@ import argparse
 import json
 import os
 import pathlib
+import time
 from collections import defaultdict
 from string import Template
 
+import torch
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
@@ -14,11 +16,17 @@ from custum_evals import (
     DummyModel,
     MultiGPUInformationRetrievalEvaluator,
     MultiGPUNanoBEIREvaluator,
+    UBinarySentenceTransformer,
     get_embedding_for_dataset,
+    hamming_similarity_from_distance,
 )
 from datasets import load_dataset
+from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
 from sentence_transformers import models as s_models
+
+load_dotenv()
+
 
 parser = argparse.ArgumentParser(description="Sentence Transformer Training Config")
 
@@ -32,14 +40,19 @@ parser.add_argument(
         "nasa_sde_ir_v1",
         "nasa_sde_ir_v2",
         "nasa_sde_ir_v3",
+        "nasa_sde_ir_v4",
         "nasa_smd_ir",
         "shortform-fullform",
+        "nasa_repo_code_benchmark_v0.1",
+        "codesearchnet_testset_benchmark_v0.2",
+        "codesearchnet_testset_benchmark_v0.1",
     ],
 )
 parser.add_argument("--ks", nargs="*", default=[1, 3, 5, 10])
 parser.add_argument("--json_output_path", type=str, default="results_json/")
 parser.add_argument("--output_dir_plots", type=str, default="results_plots/")
-parser.add_argument("--batch_size", type=int, default=8)
+parser.add_argument("--json_time_path", type=str, default="results_times/")
+parser.add_argument("--batch_size", type=int, default=1)
 parser.add_argument(
     "--just_plot",
     type=int,
@@ -60,6 +73,7 @@ args = parser.parse_args()
 dataset_name = args.dataset_name
 ks = args.ks
 json_output_path = args.json_output_path
+json_time_path = args.json_time_path
 output_dir_plots = args.output_dir_plots
 batch_size = args.batch_size
 just_plot = args.just_plot
@@ -67,80 +81,133 @@ desired_metric_types = args.desired_metric_types
 
 
 os.makedirs(json_output_path, exist_ok=True)
+os.makedirs(json_time_path, exist_ok=True)
 os.makedirs(output_dir_plots, exist_ok=True)
+json_time_path = f"{json_time_path}/{dataset_name}_corpus_embedding_times.json"
 json_output_path = f"{json_output_path}/{dataset_name}_eval_dump.json"
 
+
+similarity_fns = {
+    "hamming": hamming_similarity_from_distance,
+}
 
 models = {
     "modernbert-embed-base": {
         "path": "nomic-ai/modernbert-embed-base",
         "color": "#1f77b4",
+        "model_config": {
+            "torch_dtype": torch.float16,
+        },
     },
     "nasa-smd-ibm-st-v2": {
         "path": "nasa-impact/nasa-smd-ibm-st-v2",
         "color": "#ff7f0e",
     },
-    "indus-sde-st-v0.1": {"path": "nasa-impact/indus-sde-st-v0.1", "color": "#2ca02c"},
-    "indus-sde-st-v0.2_whole-moon-14": {
-        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/"
-        "model-qr3ln5om:v1/checkpoint-116000",
-        "color": "#d62728",
-    },
-    "indus-sde-st-v0.2_atomic-plasma-15": {
-        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/"
-        "model-ykf0bews:v1/checkpoint-13000",
-        "color": "#9467bd",
-    },
-    "indus-sde-st-v0.2_vocal-river-16": {
-        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/"
-        "model-dexwvlkj:v1/checkpoint-13000",
-        "color": "#8c564b",
-    },
-    "indus-sde-st-v0.2_super-armadillo-25": {
-        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/"
-        "model-1ogtkl75:v1/checkpoint-268500",
-        "color": "#e377c2",
-    },
-    "indus-sde-st-v0.2_drawn-puddle-31": {
-        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/"
-        "model-3x845j4d:v1/checkpoint-11000",
-        "color": "#7f7f7f",
-    },
-    "indus-sde-st-v0.2_peach-night-57": {
-        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/"
-        "model-rpv7vnpd:v1/checkpoint-13500",
-        "color": "#bcbd22",
-    },
-    "indus-sde-st-v0.2_peach-night-57_42k": {
-        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/model-rpv7vnpd:v1/checkpoint-42000",
-        "color": "#2affdb",
-    },
-    "indus-sde-st-v0.2_polar-monkey-61_20k": {
-        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/model-6hjbp1bx:v1/checkpoint-20000",
-        "color": "#ffbb78",
-    },
+    # "indus-sde-st-v0.1": {"path": "nasa-impact/indus-sde-st-v0.1", "color": "#2ca02c"},
+    # "indus-sde-st-v0.2_whole-moon-14": {
+    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/"
+    #     "model-qr3ln5om:v1/checkpoint-116000",
+    #     "color": "#d62728",
+    # },
+    # "indus-sde-st-v0.2_atomic-plasma-15": {
+    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/"
+    #     "model-ykf0bews:v1/checkpoint-13000",
+    #     "color": "#9467bd",
+    # },
+    # "indus-sde-st-v0.2_vocal-river-16": {
+    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/"
+    #     "model-dexwvlkj:v1/checkpoint-13000",
+    #     "color": "#8c564b",
+    # },
+    # "indus-sde-st-v0.2_super-armadillo-25": {
+    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/"
+    #     "model-1ogtkl75:v1/checkpoint-268500",
+    #     "color": "#e377c2",
+    # },
+    # "indus-sde-st-v0.2_drawn-puddle-31": {
+    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/"
+    #     "model-3x845j4d:v1/checkpoint-11000",
+    #     "color": "#7f7f7f",
+    # },
+    # "indus-sde-st-v0.2_peach-night-57": {
+    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/"
+    #     "model-rpv7vnpd:v1/checkpoint-13500",
+    #     "color": "#bcbd22",
+    # },
+    # "indus-sde-st-v0.2_peach-night-57_42k": {
+    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/model-rpv7vnpd:v1/checkpoint-42000",
+    #     "color": "#2affdb",
+    # },
+    # "indus-sde-st-v0.2_polar-monkey-61_20k": {
+    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/model-6hjbp1bx:v1/checkpoint-20000",
+    #     "color": "#ffbb78",
+    # },
     "indus-sde-st-v0.2_polar-monkey-61_30k": {
         "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/model-6hjbp1bx:v1/checkpoint-30000",
         "color": "#33ff77",
     },
-    "nasa-smd-ibm-st-v2(ft_ads_sde)": {
-        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/model-xfpc778s:v1/checkpoint-1492",
-        "color": "#6622ee",
-    },
-    "deploy_model_v2": {
-        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/deploy_model_v2",
-        "color": "#6e9944",
-    },
-    "deployed_model_v1_slow_token_cls_pool": {
-        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/deploy_model_v1",
-        "color": "#cc4444",
-        "pooling_mode": "cls",  # This is the special flag
-    },
+    # "nasa-smd-ibm-st-v2(ft_ads_sde)": {
+    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/model-xfpc778s:v1/checkpoint-1492",
+    #     "color": "#6622ee",
+    # },
+    # "deploy_model_v2": {
+    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/deploy_model_v2",
+    #     "color": "#6e9944",
+    # },
+    # "deployed_model_v1_slow_token_cls_pool": {
+    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/deploy_model_v1",
+    #     "color": "#cc4444",
+    #     "pooling_mode": "cls",  # This is the special flag
+    # },
     # "Qwen3-Embedding-0.6B": {
     #     "path": "Qwen/Qwen3-Embedding-0.6B",
     #     "color": "#bcbd22",
-    #     "query_prompt": "Instruct: Given a search query (could be a question, title, or text), retrieve relevant scientific passages that answer or describe the query. \nQuery:",
+    #     "query_prompt": "Instruct: Given a search query (could be a question, title, or text),"
+    #     " retrieve relevant scientific passages that answer or describe the query. \nQuery:",
     #     }
+    # "indus-sde-st-v0.2-61_30k-ubinary_emb": {
+    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/model-6hjbp1bx:v1/checkpoint-30000",
+    #     "color": "#9933aa",
+    #     "similarity_fn_name": "hamming",
+    # },
+    "granite-embedding-small-english-r2": {
+        "path": "ibm-granite/granite-embedding-small-english-r2",
+        "color": "#bcbd22",
+        "model_config": {
+            "torch_dtype": torch.float16,
+        },
+    },
+    # "granite-embedding-english-r2": {
+    #     "path": "ibm-granite/granite-embedding-english-r2",
+    #     "color": "#6e9944"
+    # },
+    "s3_firm-dust-7": {
+        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/stage3_models/firm-dust-7/checkpoint-12782",
+        "color": "#ff4a0e",
+    },
+    "s3_twilight-forest-14_(granite_small_r2)": {
+        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/"
+        "stage3_models/twilight-forest-14/checkpoint-3000",
+        "color": "#036b71",
+        "model_config": {
+            "torch_dtype": torch.float16,
+        },
+    },
+    "codebert-base": {
+        "path": "microsoft/codebert-base",
+        "color": "#9933aa",
+    },
+    "CodeBERTa-small-v1": {
+        "path": "huggingface/CodeBERTa-small-v1",
+        "color": "#1166cc",
+    },
+    # "jina-code-embeddings-0.5b": {
+    #     "path": "jinaai/jina-code-embeddings-0.5b",
+    #     "color": "#CB1B88",
+    #     "model_config": {
+    #         "torch_dtype": torch.float16
+    #     }
+    # }
 }
 
 embeddings = {
@@ -222,6 +289,25 @@ dataset_config = {
             "#7f7f7f",  # title-description~PDS.tsv
         ],
     },
+    "nasa_sde_ir_v4": {
+        "path": "nasa-impact/nasa-sde-IR-benchmark-sample-v4",
+        "data_files": [
+            "qrels/search_term-document~CMR.tsv",
+            "qrels/search_term-document~PDS.tsv",
+            "qrels/search_term-document~SDE_general_v2.tsv",
+            "qrels/search_term-document~SDE_general_v3.tsv",
+            "qrels/title-description~CMR.tsv",
+            "qrels/title-description~PDS.tsv",
+        ],
+        "data_files_colors": [
+            "#2ca02c",  # search_term-document~CMR.tsv
+            "#d62728",  # search_term-document~PDS.tsv
+            "#9467bd",  # search_term-document~SDE_general_v2.tsv
+            "#8c564b",  # search_term-document~SDE_general_v3.tsv
+            "#e377c2",  # title-description~CMR.tsv
+            "#7f7f7f",  # title-description~PDS.tsv
+        ],
+    },
     "shortform-fullform": {
         "path": "/rhome/sawale/indus_traning/sentense_transformers/data/short_full_form_pairs",
         # "path": "/rhome/sawale/indus_traning/sentense_transformers/data/short_full_form_pairs_v1",
@@ -280,6 +366,59 @@ dataset_config = {
             "#843c39",  # qrels/pim_spase_observatories.tsv
         ],
     },
+    "nasa_repo_code_benchmark_v0.1": {
+        "path": "nasa-impact/nasa_repo_code_benchmark_v0.1",
+        "data_files": [
+            "qrels/nasa_science_class_code_docstring_heldout.tsv",
+            "qrels/nasa_science_class_code_identifier_heldout.tsv",
+            "qrels/nasa_science_function_code_docstring_heldout.tsv",
+            "qrels/nasa_science_function_code_identifier_heldout.tsv",
+        ],
+        "data_files_colors": [
+            "#1f77b4",  # nasa_science_class_code_docstring_heldout.tsv
+            "#ff7f0e",  # nasa_science_class_code_identifier_heldout.tsv
+            "#2ca02c",  # nasa_science_function_code_docstring_heldout.tsv
+            "#d62728",  # nasa_science_function_code_identifier_heldout.tsv
+        ],
+    },
+    "codesearchnet_testset_benchmark_v0.2": {
+        "path": "nasa-impact/codesearchnet_testset_benchmark_v0.2",
+        "data_files": [
+            "qrels/python.tsv",
+            "qrels/java.tsv",
+            "qrels/javascript.tsv",
+            "qrels/php.tsv",
+            "qrels/ruby.tsv",
+            "qrels/go.tsv",
+        ],
+        "data_files_colors": [
+            "#1f77b4",  # qrels/python.tsv
+            "#ff7f0e",  # qrels/java.tsv
+            "#2ca02c",  # qrels/javascript.tsv
+            "#d62728",  # qrels/php.tsv
+            "#9467bd",  # qrels/ruby.tsv
+            "#8c564b",  # qrels/go.tsv
+        ],
+    },
+    "codesearchnet_testset_benchmark_v0.1": {
+        "path": "nasa-impact/codesearchnet_testset_benchmark_v0.1",
+        "data_files": [
+            "qrels/python.tsv",
+            "qrels/java.tsv",
+            "qrels/javascript.tsv",
+            "qrels/php.tsv",
+            "qrels/ruby.tsv",
+            "qrels/go.tsv",
+        ],
+        "data_files_colors": [
+            "#1f77b4",  # qrels/python.tsv
+            "#ff7f0e",  # qrels/java.tsv
+            "#2ca02c",  # qrels/javascript.tsv
+            "#d62728",  # qrels/php.tsv
+            "#9467bd",  # qrels/ruby.tsv
+            "#8c564b",  # qrels/go.tsv
+        ],
+    },
 }
 
 
@@ -294,16 +433,19 @@ def dataset_getter(
         dataset_config[dataset_name]["path"],
         data_files="corpus.jsonl",
         split=corpus_split,
+        token=os.environ["HUGGINGFACE_TOKEN"],
     )
     queries = load_dataset(
         dataset_config[dataset_name]["path"],
         data_files="queries.jsonl",
         split=queries_split,
+        token=os.environ["HUGGINGFACE_TOKEN"],
     )
     relevant_docs_data = load_dataset(
         dataset_config[dataset_name]["path"],
         split=relevant_docs_split,
         data_files=data_file,
+        token=os.environ["HUGGINGFACE_TOKEN"],
     )
 
     corpus = {row["_id"]: row["text"] for i, row in enumerate(corpus)}
@@ -373,8 +515,9 @@ def get_evaluator(
     subset=None,
     data_file=None,
 ):
+
     if dataset_name.lower() == "nanobeir":
-        evaluator = MultiGPUNanoBEIREvaluator(
+        args = dict(
             dataset_names=None,
             mrr_at_k=ks,
             accuracy_at_k=ks,
@@ -385,9 +528,16 @@ def get_evaluator(
             batch_size=batch_size,
             write_csv=True,
         )
+        evaluators = {
+            **{"cosine": MultiGPUNanoBEIREvaluator(**args)},
+            **{
+                name: MultiGPUNanoBEIREvaluator(**args, score_functions={name: fn})
+                for name, fn in similarity_fns.items()
+            },
+        }
 
     elif dataset_name.lower() == "beir":
-        evaluator = MultiGPUInformationRetrievalEvaluator(
+        args = dict(
             queries=queries,
             corpus=corpus,
             relevant_docs=relevant_docs_data,
@@ -403,9 +553,18 @@ def get_evaluator(
             encode_chunk_size=5000,
             encode_batch_size=batch_size,
         )
+        evaluators = {
+            **{"cosine": MultiGPUInformationRetrievalEvaluator(**args)},
+            **{
+                name: MultiGPUInformationRetrievalEvaluator(
+                    **args, score_functions={name: fn}
+                )
+                for name, fn in similarity_fns.items()
+            },
+        }
 
     elif dataset_name.lower() == "nasa_sde_ir_v1":
-        evaluator = MultiGPUInformationRetrievalEvaluator(
+        args = dict(
             queries=queries,
             corpus=corpus,
             relevant_docs=relevant_docs_data,
@@ -421,9 +580,18 @@ def get_evaluator(
             encode_chunk_size=5000,
             encode_batch_size=batch_size,
         )
+        evaluators = {
+            **{"cosine": MultiGPUInformationRetrievalEvaluator(**args)},
+            **{
+                name: MultiGPUInformationRetrievalEvaluator(
+                    **args, score_functions={name: fn}
+                )
+                for name, fn in similarity_fns.items()
+            },
+        }
 
     elif dataset_name.lower() == "nasa_sde_ir_v2":
-        evaluator = MultiGPUInformationRetrievalEvaluator(
+        args = dict(
             queries=queries,
             corpus=corpus,
             relevant_docs=relevant_docs_data,
@@ -439,9 +607,25 @@ def get_evaluator(
             encode_chunk_size=5000,
             encode_batch_size=batch_size,
         )
+        evaluators = {
+            **{"cosine": MultiGPUInformationRetrievalEvaluator(**args)},
+            **{
+                name: MultiGPUInformationRetrievalEvaluator(
+                    **args, score_functions={name: fn}
+                )
+                for name, fn in similarity_fns.items()
+            },
+        }
 
-    elif dataset_name.lower() in ["nasa_sde_ir_v3", "shortform-fullform"]:
-        evaluator = MultiGPUInformationRetrievalEvaluator(
+    elif dataset_name.lower() in [
+        "nasa_sde_ir_v3",
+        "shortform-fullform",
+        "nasa_sde_ir_v4",
+        "nasa_repo_code_benchmark_v0.1",
+        "codesearchnet_testset_benchmark_v0.1",
+        "codesearchnet_testset_benchmark_v0.2",
+    ]:
+        args = dict(
             queries=queries,
             corpus=corpus,
             relevant_docs=relevant_docs_data,
@@ -457,9 +641,18 @@ def get_evaluator(
             encode_chunk_size=5000,
             encode_batch_size=batch_size,
         )
+        evaluators = {
+            **{"cosine": MultiGPUInformationRetrievalEvaluator(**args)},
+            **{
+                name: MultiGPUInformationRetrievalEvaluator(
+                    **args, score_functions={name: fn}
+                )
+                for name, fn in similarity_fns.items()
+            },
+        }
 
     elif dataset_name.lower() == "nasa_smd_ir":
-        evaluator = MultiGPUInformationRetrievalEvaluator(
+        args = dict(
             queries=queries,
             corpus=corpus,
             relevant_docs=relevant_docs_data,
@@ -475,12 +668,34 @@ def get_evaluator(
             encode_chunk_size=5000,
             encode_batch_size=batch_size,
         )
+        evaluators = {
+            **{"cosine": MultiGPUInformationRetrievalEvaluator(**args)},
+            **{
+                name: MultiGPUInformationRetrievalEvaluator(
+                    **args, score_functions={name: fn}
+                )
+                for name, fn in similarity_fns.items()
+            },
+        }
 
-    return evaluator
+    return evaluators
 
 
 def add_mean_metrics(all_results, query_counts, mean_basis="subset"):
+    global models
     for model_name in all_results:
+
+        similarity_fn_names = set(
+            [i.split("_")[-2] for i in all_results[model_name].keys()]
+        )
+        if len(similarity_fn_names) > 1:
+            raise ValueError(
+                f"Multiple similarity functions found for {model_name}: "
+                f"{similarity_fn_names}. Please handle manually. Skipping..."
+            )
+
+        similarity_fn_name = similarity_fn_names.pop()
+        # similarity_fn_name = models.get(model_name, {}).get("similarity_fn_name", "cosine")
         metric_names = set(
             [i.split("_")[-1] for i in list(all_results[model_name].keys())],
         )
@@ -493,12 +708,8 @@ def add_mean_metrics(all_results, query_counts, mean_basis="subset"):
                     if "mean" not in i.split("__")[1]
                 ],
             )
-            key_name = (
-                "${dataset_name}__${mean_basis_name}____evaluator_cosine_${metric}"
-            )
-            result_key_name = (
-                "${dataset_name}__${mean_type}____evaluator_cosine_${metric}"
-            )
+            key_name = "${dataset_name}__${mean_basis_name}____evaluator_${similarity_fn_name}_${metric}"
+            result_key_name = "${dataset_name}__${mean_type}____evaluator_${similarity_fn_name}_${metric}"
         elif mean_basis == "data_file":
             mean_basis_names = set(
                 [
@@ -507,12 +718,8 @@ def add_mean_metrics(all_results, query_counts, mean_basis="subset"):
                     if "mean" not in i.split("__")[2]
                 ],
             )
-            key_name = (
-                "${dataset_name}____${mean_basis_name}__evaluator_cosine_${metric}"
-            )
-            result_key_name = (
-                "${dataset_name}____${mean_type}__evaluator_cosine_${metric}"
-            )
+            key_name = "${dataset_name}____${mean_basis_name}__evaluator_${similarity_fn_name}_${metric}"
+            result_key_name = "${dataset_name}____${mean_type}__evaluator_${similarity_fn_name}_${metric}"
 
         mean_result = {}
         weighted_mean_result = {}
@@ -526,9 +733,17 @@ def add_mean_metrics(all_results, query_counts, mean_basis="subset"):
                 _key_name = Template(key_name).substitute(
                     dataset_name=dataset_name,
                     mean_basis_name=mean_basis_name,
+                    similarity_fn_name=similarity_fn_name,
                     metric=metric,
                 )
-                values.append(all_results[model_name][_key_name])
+                try:
+                    values.append(all_results[model_name][_key_name])
+                except KeyError:
+                    print(
+                        f"Key {_key_name} not found in results for model {model_name}. "
+                        f"Found only {list(all_results[model_name].keys())}. Skipping..."
+                    )
+                    continue
                 weight_key = "__".join(_key_name.split("__")[:2])
                 weight = query_counts.get(weight_key, 1)
                 weighted_values.append(values[-1] * weight)
@@ -537,6 +752,7 @@ def add_mean_metrics(all_results, query_counts, mean_basis="subset"):
             _result_key_name = Template(result_key_name).substitute(
                 dataset_name=dataset_name,
                 mean_type="mean",
+                similarity_fn_name=similarity_fn_name,
                 metric=metric,
             )
             mean_result[_result_key_name] = sum(
@@ -547,6 +763,7 @@ def add_mean_metrics(all_results, query_counts, mean_basis="subset"):
                 __result_key_name = Template(result_key_name).substitute(
                     dataset_name=dataset_name,
                     mean_type="weightedmean",
+                    similarity_fn_name=similarity_fn_name,
                     metric=metric,
                 )
                 weighted_mean_result[__result_key_name] = sum(
@@ -589,12 +806,13 @@ def pre_compute_corpus_embedding(
     subset,
     all_results,
     dataset_config,
+    time_taken,
 ):
     if dataset_name.lower() in ["nanobeir"]:
         print(
             f"Skipping pre-computation of corpus embeddings for {dataset_name} as it is not supported.",
         )
-        return {}
+        return {}, {}
     data_file = dataset_config[dataset_name].get("data_files", [None])
     # n_data_files = len(data_file)
 
@@ -609,18 +827,21 @@ def pre_compute_corpus_embedding(
     corpus_texts = list(corpus.values())
     corpus_pre_computed_embeddings = {}
     for model_name, model_info in models.items():
-
         if check_if_eval_already_exists(all_results, model_name, subset, data_file[0]):
             print(
-                f"Model {model_name} with the subset {subset} and data_file {data_file[0]} already evaluated. Skipping...Preembedding of corpus",
+                f"Model {model_name} with the subset {subset} and data_file {data_file[0]} "
+                f"already evaluated. Skipping...Preembedding of corpus",
             )
             continue
 
         print(
             f"Pre-computing corpus embeddings for model: {model_name}, subset: {subset}",
         )
+        if model_name not in time_taken:
+            time_taken[model_name] = {}
         model = load_model_with_proper_pooling(model_name, model_info)
 
+        start_time = time.time()
         pool = model.start_multi_process_pool()
 
         corpus_embeddings = model.encode(
@@ -632,11 +853,14 @@ def pre_compute_corpus_embedding(
         )
 
         model.stop_multi_process_pool(pool)
-        corpus_pre_computed_embeddings[
-            f"{dataset_name}__{subset}__{model_name}"
-        ] = corpus_embeddings
+        end_time = time.time()
+        time_taken[model_name][f"{dataset_name}__{subset}"] = end_time - start_time
 
-    return corpus_pre_computed_embeddings
+        corpus_pre_computed_embeddings[f"{dataset_name}__{subset}__{model_name}"] = (
+            corpus_embeddings
+        )
+
+    return corpus_pre_computed_embeddings, time_taken
 
 
 def load_json_if_exists(path):
@@ -654,6 +878,7 @@ def generate_query_counts_for_nanobeir(dataset_config, dataset_name):
             path,
             split="train",
             name="qrels",
+            token=os.environ["HUGGINGFACE_TOKEN"],
         )
         query_counts[f"{dataset_name}__{d_name}__"] = len(relevant_docs_data)
 
@@ -673,17 +898,34 @@ def load_model_with_proper_pooling(model_name, model_info):
             pooling_mode=model_info["pooling_mode"],  # Use the mode from our config
         )
         # 3. Create the final SentenceTransformer model from these two modules
-        model = SentenceTransformer(modules=[transformer_layer, pooling_layer])
+        if model_info.get("similarity_fn_name") == "hamming":
+            print(f"Using UBinarySentenceTransformer for {model_name}")
+            model = UBinarySentenceTransformer(
+                modules=[transformer_layer, pooling_layer]
+            )
+        else:
+            print(f"Using SentenceTransformer for {model_name}")
+            model = SentenceTransformer(modules=[transformer_layer, pooling_layer])
 
     else:
         # This is the default behavior for all other models
         print(f"Loading {model_name} with default pooling...")
-        model = SentenceTransformer(model_info["path"])
+        if model_info.get("similarity_fn_name") == "hamming":
+            print(f"Using UBinarySentenceTransformer for {model_name}")
+            model = UBinarySentenceTransformer(
+                model_info["path"], model_kwargs=model_info.get("model_config", {})
+            )
+        else:
+            print(f"Using SentenceTransformer for {model_name}")
+            model = SentenceTransformer(
+                model_info["path"], model_kwargs=model_info.get("model_config", {})
+            )
 
     return model
 
 
 def evaluate():
+    time_taken = load_json_if_exists(json_time_path)
     all_results = load_json_if_exists(json_output_path)
     query_counts = {}
 
@@ -693,13 +935,14 @@ def evaluate():
         # check if there is multiple data_files for the dataset_name
 
         # precompute corpus embeddings for different dataset_name-subset-model_name
-        ## for different data_files, only relevant_docs / qrels are different
-        corpus_pre_computed_embeddings = pre_compute_corpus_embedding(
+        # for different data_files, only relevant_docs / qrels are different
+        corpus_pre_computed_embeddings, time_taken = pre_compute_corpus_embedding(
             models,
             dataset_name,
             subset,
             all_results,
             dataset_config,
+            time_taken,
         )
         for data_file in dataset_config[dataset_name].get("data_files", [None]):
             corpus, queries, relevant_docs = get_dataset(
@@ -710,9 +953,10 @@ def evaluate():
             )
             if relevant_docs is not None:
                 query_counts[
-                    f"{dataset_name}__{subset if subset is not None else ''}__{data_file if data_file is not None else ''}"
+                    f"{dataset_name}__{subset if subset is not None else ''}__"
+                    f"{data_file if data_file is not None else ''}"
                 ] = len(relevant_docs)
-            evaluator = get_evaluator(
+            evaluators = get_evaluator(
                 dataset_name,
                 queries,
                 corpus,
@@ -732,11 +976,14 @@ def evaluate():
                     data_file,
                 ):
                     print(
-                        f"Model {model_name} with the subset {subset} and data_file {data_file} already evaluated. Skipping...",
+                        f"Model {model_name} with the subset {subset} and data_file "
+                        f"{data_file} already evaluated. Skipping...",
                     )
                     continue
                 model = load_model_with_proper_pooling(model_name, model_info)
-                results = evaluator(
+                results = evaluators.get(
+                    model_info.get("similarity_fn_name", "cosine")
+                )(
                     model,
                     query_prompt_str=model_info.get("query_prompt", None),
                     corpus_embeddings=corpus_pre_computed_embeddings.get(
@@ -753,7 +1000,8 @@ def evaluate():
             # Looping through the embeddings
             for embedding_name, embedding_info in embeddings.items():
                 print(
-                    f"Evaluating embedding: {embedding_name}, subset {subset} and data_file: {data_file}",
+                    f"Evaluating embedding: {embedding_name}, "
+                    f"subset {subset} and data_file: {data_file}",
                 )
                 if check_if_eval_already_exists(
                     all_results,
@@ -785,13 +1033,17 @@ def evaluate():
                     queries_df,
                     pd.DataFrame,
                 ):
-                    results = evaluator(
+                    results = evaluators.get(
+                        model_info.get("similarity_fn_name", "cosine")
+                    )(
                         model=dummy_model,
                         corpus_df=corpus_df,
                         query_df=queries_df,
                     )
                 elif isinstance(corpus_df, dict) and isinstance(queries_df, dict):
-                    results = evaluator(
+                    results = evaluators.get(
+                        model_info.get("similarity_fn_name", "cosine")
+                    )(
                         model=dummy_model,
                         corpus_dfs=corpus_df,
                         query_dfs=queries_df,
@@ -819,11 +1071,15 @@ def evaluate():
     with open(json_output_path, "w", encoding="utf-8") as f:
         json.dump(all_results, f, ensure_ascii=False, indent=4)
 
+    with open(json_time_path, "w", encoding="utf-8") as f:
+        json.dump(time_taken, f, ensure_ascii=False, indent=4)
+
 
 def convert_json_output_to_df(json_output_path):
     if not os.path.exists(json_output_path):
         print(
-            f"JSON output path {json_output_path} does not exist. Please run the evaluation first.",
+            f"JSON output path {json_output_path} does not exist."
+            "Please run the evaluation first.",
         )
         return
     with open(json_output_path, "r", encoding="utf-8") as f:
@@ -1069,5 +1325,6 @@ def plot_data_files_based_eval(json_output_path):
 if __name__ == "__main__":
     if not just_plot:
         evaluate()
+
     plot_results(json_output_path)
     plot_data_files_based_eval(json_output_path)
