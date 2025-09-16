@@ -9,14 +9,20 @@ from typing import Dict, Union
 
 import distributed
 import torch
+import wandb
 from datasets import Dataset, DatasetDict, concatenate_datasets
 from datasets import config as dataset_config
 from datasets import get_dataset_config_names, load_dataset, load_from_disk
 from distributed import init_ddp, print0
 from dotenv import load_dotenv
+from huggingface_hub import login
 from multidataset_sampler import WeightedBatchSampler
 from pretokenize import prepare_pre_tokenized_datasets
-from sentence_transformers import SentenceTransformer, SentenceTransformerTrainer
+from sentence_transformers import (
+    SentenceTransformer,
+    SentenceTransformerTrainer,
+    models,
+)
 from sentence_transformers.evaluation import (
     InformationRetrievalEvaluator,
     SequentialEvaluator,
@@ -37,17 +43,14 @@ from torch.nn.parallel import DistributedDataParallel
 from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import BatchSampler, ConcatDataset
 from transformers.optimization import get_scheduler  # For fallback in custom trainer
-from utils import (
+from utils import (  # build_dataset_configs_s1,; build_dataset_configs_s2,
+    BinarizationLayer,
     PreTokenizedCollator,
-    build_dataset_configs_s1,
-    build_dataset_configs_s2,
     build_dataset_configs_s3,
     get_gpu_info,
     load_and_cache_datasets,
     prepare_evaluators,
 )
-
-import wandb
 
 # ──────────────── Constants ────────────────
 
@@ -118,12 +121,16 @@ parser.add_argument(
     default=0.1,
     help="Magnitude of cosine oscillation as a fraction of the current linear LR in the custom scheduler.",
 )
-
 parser.add_argument(
     "--lr_scheduler_type",
     type=str,
     default="cosine",
     help="Fallback lr schedular",
+)
+parser.add_argument(
+    "--bat",
+    action="store_true",
+    help="Enable Binarization Aware Training.",
 )
 
 
@@ -148,6 +155,7 @@ CACHE_DIR = f"../data/stage3_cache/NROWS_{NROWS}"
 GRADIENT_ACCUMULATION_STEPS = args.gradient_accumulation_steps
 LEARNING_RATE = args.lr
 PRETOKENIZE = args.pretokenize
+BAT = args.bat
 
 # Store new custom scheduler args
 CUSTOM_LR_SCHEDULER_ENABLED = args.custom_lr_scheduler
@@ -160,6 +168,13 @@ current_datetime = datetime.datetime.now()
 formatted_datetime = current_datetime.strftime("%Y%m%d_%H-%M-%S")
 os.makedirs(CACHE_DIR, exist_ok=True)
 assert os.getenv("WANDB_LOG_MODEL") == "end"
+
+# login to hf
+# Log in programmatically
+if os.getenv("HUGGINGFACE_TOKEN"):
+    login(token=os.getenv("HUGGINGFACE_TOKEN"))
+else:
+    print("Hugging Face token not found. Please set HUGGINGFACE_TOKEN.")
 
 wandb_config = {
     "model_name": MODEL_NAME,
@@ -175,6 +190,7 @@ wandb_config = {
     "max_datapoints_per_src_for_eval": MAX_DATAPOINTS_PER_SRC_FOR_EVAL,
     "pretokenization": PRETOKENIZE,
     "lr_max (initial_lr)": LEARNING_RATE,
+    "BAT - Binarization Aware Training": BAT,
 }
 
 if CUSTOM_LR_SCHEDULER_ENABLED:
@@ -390,15 +406,44 @@ class CustomSentenceTransformerTrainer(SentenceTransformerTrainer):
             )
 
 
+def initilize_model(local_rank):
+    global BAT, MODEL_NAME, MODEL_MAX_LEN
+
+    if BAT:
+        word_embedding_model = models.Transformer(MODEL_NAME)
+        pooling_model = models.Pooling(
+            word_embedding_model.get_word_embedding_dimension(),
+        )
+
+        # Add our custom binarization layer after the pooling layer
+        binarization_model = BinarizationLayer()
+
+        # Create the final model by sequencing the layers
+        model = SentenceTransformer(
+            modules=[
+                word_embedding_model,
+                pooling_model,
+                binarization_model,
+            ],
+            device=f"cuda:{local_rank}",
+            tokenizer_kwargs={"model_max_length": MODEL_MAX_LEN, "truncation": True},
+            model_kwargs={"torch_dtype": torch.bfloat16 if bf16_supported else None},
+        )
+    else:
+        model = SentenceTransformer(
+            MODEL_NAME,
+            device=f"cuda:{local_rank}",
+            tokenizer_kwargs={"model_max_length": MODEL_MAX_LEN, "truncation": True},
+            model_kwargs={"torch_dtype": torch.bfloat16 if bf16_supported else None},
+        )
+
+    return model
+
+
 # ──────────────── Main ────────────────
 def main(local_rank, rank):
     global args
-    model = SentenceTransformer(
-        MODEL_NAME,
-        device=f"cuda:{local_rank}",
-        tokenizer_kwargs={"model_max_length": MODEL_MAX_LEN, "truncation": True},
-        model_kwargs={"torch_dtype": torch.bfloat16 if bf16_supported else None},
-    )
+    model = initilize_model(local_rank)
     configs = build_dataset_configs_s3(N_DATA_SRC)
     ds_dict = load_and_cache_datasets(configs, CACHE_DIR, NROWS, rank)
 
@@ -529,9 +574,9 @@ def main(local_rank, rank):
         eval_cache_dir = CACHE_DIR + "_evaluator/test"
         test_evaluator = prepare_evaluators(
             {
-                n: s["validation"]
+                n: s["test"]
                 for n, s in ds_dict.items()
-                if n in ("nasa-sde-st", "nasa_ads")
+                # if n in ("nasa-sde-st", "nasa_ads")
             },  # NOTE (for testing) evaluate only the ade and sde datasets
             max_per_split=None,
             BATCH_SIZE=BATCH_SIZE,

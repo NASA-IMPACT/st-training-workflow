@@ -1,6 +1,7 @@
 import argparse
 import csv  # For CSV writing
 import datetime
+import json
 import os
 import pickle
 import random
@@ -11,6 +12,7 @@ from typing import Dict, List, Optional, Union
 import distributed
 import joblib
 import torch
+import wandb
 from datasets import (
     Dataset,
     DatasetDict,
@@ -38,11 +40,11 @@ from sentence_transformers.training_args import (
     BatchSamplers,
     SentenceTransformerTrainingArguments,
 )
+from torch import nn
+from torch.autograd import Function
 from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-
-import wandb
 
 
 def get_gpu_info():
@@ -117,51 +119,55 @@ def get_all_data_subset(name: str, path: str, s1: str, s2: str, loss_fn) -> dict
         }
     return out
 
+
 def build_dataset_configs_s3(N_DATA_SRC=None) -> dict:
     """
     Define all your dataset mappings and losses for stage 3 data.
     """
+
     base = {
         "nasa-science-function-code-docstring": {
             "args": {"path": "nasa-impact/nasa-science-function-code-docstring"},
-            "map_fn": lambda ex: {"anchor": ex["code"], "positive": ex["original_docstring"]},
+            "map_fn": lambda ex: {
+                "anchor": ex["original_docstring"],
+                "positive": ex["code"],
+            },
             "loss": MultipleNegativesRankingLoss,
-            "weight": 1,  
+            "weight": 1,  # Optional weight for sampling this datadet when using WeightedBatchSampler; if not specified, defaults to 1.0
         },
-
         "nasa-science-class-code-docstring": {
             "args": {"path": "nasa-impact/nasa-science-class-code-docstring"},
-            "map_fn": lambda ex: {"anchor": ex["code"], "positive": ex["original_docstring"]},
+            "map_fn": lambda ex: {
+                "anchor": ex["original_docstring"],
+                "positive": ex["code"],
+            },
             "loss": MultipleNegativesRankingLoss,
-            "weight": 1,  
+            "weight": 1,  # Optional weight for sampling this datadet when using WeightedBatchSampler; if not specified, defaults to 1.0
         },
         "nasa-science-function-code-identifier": {
             "args": {"path": "nasa-impact/nasa-science-function-code-identifier"},
-            "map_fn": lambda ex: {"anchor": ex["code"], "positive": ex["identifier"]},
+            "map_fn": lambda ex: {"anchor": ex["identifier"], "positive": ex["code"]},
             "loss": MultipleNegativesRankingLoss,
-            "weight": 1,  
+            "weight": 1,  # Optional weight for sampling this datadet when using WeightedBatchSampler; if not specified, defaults to 1.0
         },
         "nasa-science-class-code-identifier": {
             "args": {"path": "nasa-impact/nasa-science-class-code-identifier"},
-            "map_fn": lambda ex: {"anchor": ex["code"], "positive": ex["identifier"]},
+            "map_fn": lambda ex: {"anchor": ex["identifier"], "positive": ex["code"]},
             "loss": MultipleNegativesRankingLoss,
-            "weight": 1,  
+            "weight": 1,  # Optional weight for sampling this datadet when using WeightedBatchSampler; if not specified, defaults to 1.0
         },
-
-        "the-vault-function": {
-            "args": {"path": "Fsoft-AIC/the-vault-function"},
-            "map_fn": lambda ex: {"anchor": ex["code"], "positive": ex["original_docstring"]},
-            "loss": MultipleNegativesRankingLoss,
-            "weight": 1,  
-        },
-
-        "the-vault-class": {
-            "args": {"path": "Fsoft-AIC/the-vault-class"},
-            "map_fn": lambda ex: {"anchor": ex["code"], "positive": ex["original_docstring"]},
-            "loss": MultipleNegativesRankingLoss,
-            "weight": 1,  
-        },
-        
+        # "the-vault-function": {
+        #     "args": {"path": "Fsoft-AIC/the-vault-function"},
+        #     "map_fn": lambda ex: {"anchor": ex["original_docstring"], "positive": ex["code"]},
+        #     "loss": MultipleNegativesRankingLoss,
+        #     "weight": 1,  # Optional weight for sampling this datadet when using WeightedBatchSampler; if not specified, defaults to 1.0
+        # },
+        # "the-vault-class": {
+        #     "args": {"path": "Fsoft-AIC/the-vault-class"},
+        #     "map_fn": lambda ex: {"anchor": ex["original_docstring"], "positive": ex["code"]},
+        #     "loss": MultipleNegativesRankingLoss,
+        #     "weight": 1,  # Optional weight for sampling this datadet when using WeightedBatchSampler; if not specified, defaults to 1.0
+        # },
     }
 
     if N_DATA_SRC is not None:
@@ -265,9 +271,8 @@ def build_dataset_configs_s2(N_DATA_SRC=None) -> dict:
             "args": {"path": "stage1/stage1_pairs"},
             "map_fn": lambda ex: {"anchor": ex["query"], "positive": ex["context"]},
             "loss": MultipleNegativesRankingLoss,
-            "weight": 1,  #sample from stage1
+            "weight": 1,  # sample from stage1
         },
-
         # "pmc": {
         #     "args": {"path": "../data_prep/raw/pmc_open_access.py", "split": "train"},
         #     "map_fn": lambda ex: {
@@ -1078,3 +1083,68 @@ class PreTokenizedCollator(SentenceTransformerDataCollator):
             batch["negative_attention_mask"] = neg_mask
 
         return batch
+
+
+# --- Define the Straight-Through Estimator (STE) for Binarization ---
+# We create a custom autograd function to handle the non-differentiable binarization step.
+
+
+class BinarizeSTE(Function):
+    """
+    Implements the Straight-Through Estimator for binarization.
+    Forward pass: applies torch.sign() to binarize the input tensor to -1 or 1.
+    Backward pass: pretends the function was the identity, passing gradients straight through.
+    """
+
+    @staticmethod
+    def forward(ctx, input):
+        # In the forward pass, we apply the sign function to get {-1, 1}.
+        # This is the actual binarization.
+        return torch.sign(input)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        # In the backward pass, we pass the gradient directly through.
+        # This is the "straight-through" part. We treat the function as if it were y=x.
+        return grad_output
+
+
+# --- Create a PyTorch Module for our Binarization Layer ---
+# This module will apply our custom STE function. We can easily add this to a model.
+
+
+class BinarizationLayer(nn.Module):
+    def __init__(self):
+        super(BinarizationLayer, self).__init__()
+        self.binarize_fn = BinarizeSTE.apply
+
+    def forward(self, features):
+        features["sentence_embedding"] = self.binarize_fn(
+            features["sentence_embedding"],
+        )
+        return features
+
+    def save(self, output_path):
+        """Save the binarization layer configuration"""
+        os.makedirs(output_path, exist_ok=True)
+
+        # Save a simple config file
+        config = {
+            "type": "BinarizationLayer",
+            "version": "1.0",
+        }
+
+        with open(os.path.join(output_path, "config.json"), "w") as f:
+            json.dump(config, f)
+
+    @staticmethod
+    def load(input_path):
+        """Load the binarization layer"""
+        return BinarizationLayer()
+
+    def get_config_dict(self):
+        """Return configuration dictionary"""
+        return {
+            "type": "BinarizationLayer",
+            "version": "1.0",
+        }
