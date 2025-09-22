@@ -267,12 +267,12 @@ def build_dataset_configs_s2(N_DATA_SRC=None) -> dict:
             "loss": MultipleNegativesRankingLoss,
             "weight": 41 / 5,
         },
-        "stage1_pairs": {
-            "args": {"path": "stage1/stage1_pairs"},
-            "map_fn": lambda ex: {"anchor": ex["query"], "positive": ex["context"]},
-            "loss": MultipleNegativesRankingLoss,
-            "weight": 1,  # sample from stage1
-        },
+        # "stage1_pairs": {
+        #     "args": {"path": "stage1/stage1_pairs"},
+        #     "map_fn": lambda ex: {"anchor": ex["query"], "positive": ex["context"]},
+        #     "loss": MultipleNegativesRankingLoss,
+        #     "weight": 1,  # sample from stage1
+        # },
         # "pmc": {
         #     "args": {"path": "../data_prep/raw/pmc_open_access.py", "split": "train"},
         #     "map_fn": lambda ex: {
