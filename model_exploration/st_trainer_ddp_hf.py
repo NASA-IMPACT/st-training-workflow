@@ -74,6 +74,12 @@ parser.add_argument(
     default="online",
     choices=["online", "offline", "disabled"],
 )
+parser.add_argument(
+    "--wb_project",
+    type=str,
+    default="nasa-indus-sde-s3",
+    choices=["nasa-indus-sde-s1", "nasa-indus-sde-s2", "nasa-indus-sde-s3"],
+)
 parser.add_argument("--resume_checkpoint_path", type=str, default=None)
 parser.add_argument("--resume_run_id", type=str, default=None)
 parser.add_argument("--num_train_epochs", type=int, default=1)
@@ -156,6 +162,7 @@ GRADIENT_ACCUMULATION_STEPS = args.gradient_accumulation_steps
 LEARNING_RATE = args.lr
 PRETOKENIZE = args.pretokenize
 BAT = args.bat
+WB_PROJECT = args.wb_project
 
 # Store new custom scheduler args
 CUSTOM_LR_SCHEDULER_ENABLED = args.custom_lr_scheduler
@@ -608,7 +615,7 @@ if __name__ == "__main__":
             assert RESUME_RUN_ID is not None
             wandb.init(
                 entity="impact-ibm-collaboration",
-                project="nasa-indus-sde-s3",
+                project=WB_PROJECT,
                 mode=WB_MODE,
                 id=RESUME_RUN_ID,
                 resume="must",
@@ -619,7 +626,7 @@ if __name__ == "__main__":
         else:
             wandb.init(
                 entity="impact-ibm-collaboration",
-                project="nasa-indus-sde-s3",
+                project=WB_PROJECT,
                 mode=WB_MODE,
                 # group="ddp_run",
                 # job_type="train",

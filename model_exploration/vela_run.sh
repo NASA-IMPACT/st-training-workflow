@@ -9,4 +9,5 @@ torchrun --nproc_per_node=auto --master-port=29507 st_trainer_ddp_hf.py \
     --max_datapoints_per_src_for_eval 1000 \
     --warmup_ratio 0.02 \
     --cosine_cycle_steps_custom 2000 \
+    --wb_project "nasa-indus-sde-s2" \
     --bat
