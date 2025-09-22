@@ -46,7 +46,7 @@ from transformers.optimization import get_scheduler  # For fallback in custom tr
 from utils import (  # build_dataset_configs_s1,; build_dataset_configs_s2,
     BinarizationLayer,
     PreTokenizedCollator,
-    build_dataset_configs_s3,
+    build_dataset_configs_s2,
     get_gpu_info,
     load_and_cache_datasets,
     prepare_evaluators,
@@ -151,7 +151,7 @@ WARMUP_RATIO = args.warmup_ratio
 EVAL_AND_SAVE_STEPS = args.eval_and_save_steps
 MAX_DATAPOINTS_PER_SRC_FOR_EVAL = args.max_datapoints_per_src_for_eval
 N_DATA_SRC = args.n_data_src
-CACHE_DIR = f"../data/stage3_cache/NROWS_{NROWS}"
+CACHE_DIR = f"../data/stage2_cache/NROWS_{NROWS}"
 GRADIENT_ACCUMULATION_STEPS = args.gradient_accumulation_steps
 LEARNING_RATE = args.lr
 PRETOKENIZE = args.pretokenize
@@ -444,7 +444,7 @@ def initilize_model(local_rank):
 def main(local_rank, rank):
     global args
     model = initilize_model(local_rank)
-    configs = build_dataset_configs_s3(N_DATA_SRC)
+    configs = build_dataset_configs_s2(N_DATA_SRC)
     ds_dict = load_and_cache_datasets(configs, CACHE_DIR, NROWS, rank)
 
     if PRETOKENIZE:
