@@ -267,12 +267,12 @@ def build_dataset_configs_s2(N_DATA_SRC=None) -> dict:
             "loss": MultipleNegativesRankingLoss,
             "weight": 41 / 5,
         },
-        # "stage1_pairs": {
-        #     "args": {"path": "stage1/stage1_pairs"},
-        #     "map_fn": lambda ex: {"anchor": ex["query"], "positive": ex["context"]},
-        #     "loss": MultipleNegativesRankingLoss,
-        #     "weight": 1,  # sample from stage1
-        # },
+        "stage1_pairs": {
+            "args": {"path": "stage1/stage1_pairs"},
+            "map_fn": lambda ex: {"anchor": ex["query"], "positive": ex["context"]},
+            "loss": MultipleNegativesRankingLoss,
+            "weight": 1,  # sample from stage1
+        },
         # "pmc": {
         #     "args": {"path": "../data_prep/raw/pmc_open_access.py", "split": "train"},
         #     "map_fn": lambda ex: {
@@ -530,7 +530,7 @@ def load_and_cache_datasets(configs: dict, CACHE_DIR, NROWS=None, rank=None) -> 
         cache_path = os.path.join(CACHE_DIR, name)
 
         if os.path.isdir(cache_path):
-            splits = load_from_disk(cache_path, keep_in_memory=True)
+            splits = load_from_disk(cache_path, keep_in_memory=False)
         else:
             if NROWS:
                 raw = load_dataset(
@@ -1132,7 +1132,6 @@ class BinarizationLayer(nn.Module):
         config = {
             "type": "BinarizationLayer",
             "version": "1.0",
-        }
 
         with open(os.path.join(output_path, "config.json"), "w") as f:
             json.dump(config, f)
