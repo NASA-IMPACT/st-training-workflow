@@ -1132,7 +1132,7 @@ class BinarizationLayer(nn.Module):
         config = {
             "type": "BinarizationLayer",
             "version": "1.0",
-
+        }
         with open(os.path.join(output_path, "config.json"), "w") as f:
             json.dump(config, f)
 
