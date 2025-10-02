@@ -199,7 +199,7 @@ def build_dataset_configs_s2(N_DATA_SRC=None) -> dict:
             "args": {"path": "nasa-impact/nasa-sde-st-corpus"},
             "map_fn": lambda ex: {"anchor": ex["query"], "positive": ex["context"]},
             "loss": MultipleNegativesRankingLoss,
-            "weight": 41,  # Optional weight for sampling this datadet when using WeightedBatchSampler; if not specified, defaults to 1.0
+            "weight": 41 * 3/4,  # Optional weight for sampling this datadet when using WeightedBatchSampler; if not specified, defaults to 1.0
         },
         "pubmed_v3": {
             "args": {"path": "../data_prep/raw/pubmed.py", "split": "train"},
