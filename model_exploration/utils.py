@@ -11,6 +11,7 @@ from typing import Dict, List, Optional, Union
 
 import distributed
 import joblib
+import numpy as np
 import torch
 import wandb
 from datasets import (
@@ -40,7 +41,8 @@ from sentence_transformers.training_args import (
     BatchSamplers,
     SentenceTransformerTrainingArguments,
 )
-from torch import nn
+from sentence_transformers.util import _convert_to_batch_tensor
+from torch import Tensor, nn
 from torch.autograd import Function
 from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
@@ -1148,3 +1150,31 @@ class BinarizationLayer(nn.Module):
             "type": "BinarizationLayer",
             "version": "1.0",
         }
+
+
+def hamming_sim(a: list | np.ndarray | Tensor, b: list | np.ndarray | Tensor) -> Tensor:
+    """
+    Computes the (normalized) Hamming similarity between two tensors.
+    Assumes inputs are already binarized (-1, 1) from BinarizationLayer.
+    """
+    a = _convert_to_batch_tensor(a)
+    b = _convert_to_batch_tensor(b)
+
+    # Don't binarize here - assume inputs are already binary from BinarizationLayer
+    # If you need to ensure they're in {-1, 1}, use tanh which is differentiable
+    # a = torch.tanh(a)  # Soft binarization (differentiable)
+    # b = torch.tanh(b)  # Soft binarization (differentiable)
+
+    # For binary values in {-1, 1}, Hamming distance can be computed as:
+    # distance = (1 - a * b) / 2  # This gives 0 for same bits, 1 for different bits
+
+    # Compute pairwise Hamming similarity
+    a_exp = a.unsqueeze(1)  # (batch_a, 1, dim)
+    b_exp = b.unsqueeze(0)  # (1, batch_b, dim)
+
+    # For binary {-1, 1} values: similarity = (a * b + 1) / 2
+    # This gives 1 for same bits, 0 for different bits
+    agreement = (a_exp * b_exp + 1) / 2  # (batch_a, batch_b, dim)
+    similarity = agreement.mean(dim=2)  # Average over dimensions
+
+    return similarity  # (batch_a, batch_b)

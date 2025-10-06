@@ -22,6 +22,7 @@ from sentence_transformers import (
     SentenceTransformer,
     SentenceTransformerTrainer,
     models,
+    util,
 )
 from sentence_transformers.evaluation import (
     InformationRetrievalEvaluator,
@@ -48,6 +49,7 @@ from utils import (  # build_dataset_configs_s1,; build_dataset_configs_s2,
     PreTokenizedCollator,
     build_dataset_configs_s3,
     get_gpu_info,
+    hamming_sim,
     load_and_cache_datasets,
     prepare_evaluators,
 )
@@ -132,7 +134,6 @@ parser.add_argument(
     action="store_true",
     help="Enable Binarization Aware Training.",
 )
-
 
 args = parser.parse_args()
 
@@ -549,12 +550,19 @@ def main(local_rank, rank):
         "cosine_magnitude_fraction_custom": COSINE_MAGNITUDE_FRACTION_CUSTOM,
     }
 
+    # loss functions
+    loss_sim_fun = hamming_sim if BAT else util.cos_sim
+    # loss_sim_fun = util.cos_sim
+    loss_funs = {
+        n: cfg["loss"](model, similarity_fct=loss_sim_fun) for n, cfg in configs.items()
+    }
+
     trainer = CustomSentenceTransformerTrainer(
         model=model,
         args=args,
         train_dataset=train_ds,
         eval_dataset=None,
-        loss={n: cfg["loss"](model) for n, cfg in configs.items()},
+        loss=loss_funs,
         evaluator=val_evaluator,
         data_collator=collator,
         custom_lr_params=custom_lr_params_for_trainer,  # Pass our custom params
