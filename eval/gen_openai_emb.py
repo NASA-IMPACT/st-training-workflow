@@ -24,18 +24,26 @@ def get_data(
             dataset_path,
             data_files="corpus.jsonl",
             split=corpus_split,
+            token=os.environ["HUGGINGFACE_TOKEN"],
         )
         queries_dataset = load_dataset(
             dataset_path,
             data_files="queries.jsonl",
             split=queries_split,
+            token=os.environ["HUGGINGFACE_TOKEN"],
         )
     except Exception as e:
-        corpus_dataset = load_dataset(dataset_path, name="corpus", split=corpus_split)
+        corpus_dataset = load_dataset(
+            dataset_path,
+            name="corpus",
+            split=corpus_split,
+            token=os.environ["HUGGINGFACE_TOKEN"],
+        )
         queries_dataset = load_dataset(
             dataset_path,
             name="queries",
             split=queries_split,
+            token=os.environ["HUGGINGFACE_TOKEN"],
         )
 
     corpus = {row["_id"]: row["text"] for row in corpus_dataset}
@@ -137,7 +145,7 @@ async def gen_openai_emb_async(
     corpus: dict,
     queries: dict,
     model: str,
-    batch_size: int = 100,
+    batch_size: int = 50,
     concurrency_limit: int = 5,  # Max concurrent requests
 ):
     """

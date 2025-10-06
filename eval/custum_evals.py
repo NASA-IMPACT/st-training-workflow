@@ -651,6 +651,7 @@ def get_embedding_for_dataset(
     queries_path = os.path.join(base_path, "queries_embeddings.parquet")
 
     if (not os.path.exists(corpus_path)) or (not os.path.exists(queries_path)):
+        print("Could not find existing embeddings. Generating new ones...")
         dataset_input_path = None
 
         # Either path is not None eg. nasa sde v1, nasa sde v2, nasa smd ir (which is hf path)
@@ -712,6 +713,7 @@ def get_embedding_for_dataset(
             return corpus_df, queries_df
 
     else:
+        print("Found existing embeddings. Loading them...")
         corpus_df = pd.read_parquet(corpus_path)
         queries_df = pd.read_parquet(queries_path)
         return corpus_df, queries_df
@@ -720,8 +722,7 @@ def get_embedding_for_dataset(
 def hamming_similarity_from_distance(a: Tensor, b: Tensor) -> Tensor:
     """
     Computes Hamming similarity based on Hamming distance for packed binary tensors.
-    This version is more efficient as it avoids unpacking the original tensors.
-    Similarity = Total Bits - Differing Bits.
+    Memory-efficient version using PyTorch operations and chunking.
     """
 
     if isinstance(a, np.ndarray):
@@ -733,25 +734,51 @@ def hamming_similarity_from_distance(a: Tensor, b: Tensor) -> Tensor:
     a_cpu = a.cpu().to(torch.uint8)
     b_cpu = b.cpu().to(torch.uint8)
 
-    # 1. Use broadcasting to efficiently perform a bitwise XOR.
-    # This finds the differing bits between all pairs of vectors.
-    # The resulting tensor `differences` has a shape of:
-    # (num_queries, num_corpus_docs, embedding_dim_in_bytes)
-    differences = a_cpu.unsqueeze(1) ^ b_cpu.unsqueeze(0)
+    # Get dimensions
+    num_queries = a_cpu.shape[0]
+    num_corpus = b_cpu.shape[0]
+    embedding_dim_bytes = a_cpu.shape[1]
 
-    # 2. Count the number of set bits (1s) to get the Hamming distance.
-    # We convert the tensor of byte differences to a NumPy array,
-    # unpack the bits for each byte, and sum them up. This is an
-    # efficient way to perform a "population count".
-    # The result is a matrix of distances with shape: (num_queries, num_corpus_docs)
-    hamming_distance = np.unpackbits(differences.numpy(), axis=2).sum(axis=2)
+    # The total number of bits
+    vector_length = embedding_dim_bytes * 8
 
-    # 3. The total number of bits is the embedding dimension.
-    # We get this by taking the number of bytes and multiplying by 8.
-    vector_length = a_cpu.shape[1] * 8
+    # Process in smaller chunks to manage memory
+    chunk_size = min(500, num_corpus)  # Reduce chunk size for safety
 
-    # 4. Convert Hamming distance to Hamming similarity.
-    hamming_similarity = vector_length - hamming_distance
+    # Initialize result tensor
+    result = torch.zeros((num_queries, num_corpus), dtype=torch.float32)
 
-    # 5. Return the result as a PyTorch float tensor.
-    return torch.from_numpy(hamming_similarity).float()
+    # Precompute bit count lookup table for efficiency
+    bit_count_table = torch.tensor(
+        [bin(i).count("1") for i in range(256)],
+        dtype=torch.int32,
+    )
+
+    for start_idx in range(0, num_corpus, chunk_size):
+        end_idx = min(start_idx + chunk_size, num_corpus)
+
+        # Get chunk of corpus embeddings
+        b_chunk = b_cpu[start_idx:end_idx]
+
+        # Compute XOR for this chunk using broadcasting
+        # Shape: (num_queries, chunk_size, embedding_dim_bytes)
+        differences = a_cpu.unsqueeze(1) ^ b_chunk.unsqueeze(0)
+
+        # Count bits using lookup table (more memory efficient)
+        # Flatten the last dimension for vectorized lookup
+        flat_diffs = differences.view(-1)
+        bit_counts = bit_count_table[flat_diffs.long()]
+
+        # Reshape back and sum over the embedding dimension
+        bit_counts = bit_counts.view(
+            num_queries,
+            end_idx - start_idx,
+            embedding_dim_bytes,
+        )
+        hamming_distances = bit_counts.sum(dim=2)
+
+        # Convert to similarity
+        chunk_similarities = vector_length - hamming_distances.float()
+        result[:, start_idx:end_idx] = chunk_similarities
+
+    return result

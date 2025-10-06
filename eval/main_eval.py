@@ -6,10 +6,10 @@ import time
 from collections import defaultdict
 from string import Template
 
-import torch
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+import torch
 from beir import util as beir_util
 from beir.datasets.data_loader import GenericDataLoader
 from custum_evals import (
@@ -26,7 +26,9 @@ from sentence_transformers import SentenceTransformer
 from sentence_transformers import models as s_models
 
 load_dotenv()
+import sys
 
+sys.path.append("../model_exploration/")  # Add training dir to path
 
 parser = argparse.ArgumentParser(description="Sentence Transformer Training Config")
 
@@ -52,7 +54,7 @@ parser.add_argument("--ks", nargs="*", default=[1, 3, 5, 10])
 parser.add_argument("--json_output_path", type=str, default="results_json/")
 parser.add_argument("--output_dir_plots", type=str, default="results_plots/")
 parser.add_argument("--json_time_path", type=str, default="results_times/")
-parser.add_argument("--batch_size", type=int, default=1)
+parser.add_argument("--batch_size", type=int, default=4)
 parser.add_argument(
     "--just_plot",
     type=int,
@@ -165,42 +167,88 @@ models = {
     #     "query_prompt": "Instruct: Given a search query (could be a question, title, or text),"
     #     " retrieve relevant scientific passages that answer or describe the query. \nQuery:",
     #     }
-    # "indus-sde-st-v0.2-61_30k-ubinary_emb": {
-    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/model-6hjbp1bx:v1/checkpoint-30000",
-    #     "color": "#9933aa",
-    #     "similarity_fn_name": "hamming",
-    # },
-    "granite-embedding-small-english-r2": {
-        "path": "ibm-granite/granite-embedding-small-english-r2",
-        "color": "#bcbd22",
-        "model_config": {
-            "torch_dtype": torch.float16,
-        },
+    "indus-sde-st-v0.2-61_30k-ubinary_emb": {
+        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/model-6hjbp1bx:v1/checkpoint-30000",
+        "color": "#9933aa",
+        "similarity_fn_name": "hamming",
     },
+    "s2_azure-eon-73": {
+        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/s2_binarized_model/azure-eon-73/checkpoint-32500",
+        "color": "#00a9ac",
+        "similarity_fn_name": "hamming",
+    },
+    "s2_cosmic-pine-77": {
+        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/s2_binarized_model/cosmic-pine-77/checkpoint-1458",
+        "color": "#008dad",
+        "similarity_fn_name": "hamming",
+    },
+    "s2_swift-morning-78": {
+        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/s2_binarized_model/swift-morning-78/checkpoint-1458",
+        "color": "#005197",
+        "similarity_fn_name": "hamming",
+    },
+    "s2_robust-firebrand-83": {
+        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/s2_binarized_model/robust-firebrand-83/checkpoint-15000",
+        "color": "#af38f5",
+        "similarity_fn_name": "hamming",
+    },
+    "s2_celestial-butterfly-84": {
+        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/s2_binarized_model/celestial-butterfly-84/checkpoint-15000",
+        "color": "#0d06ac",
+        "similarity_fn_name": "hamming",
+    },
+    "s2_absurd-snowflake-85": {
+        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/s2_binarized_model/absurd-snowflake-85/checkpoint-20000",
+        "color": "#005282",
+        "similarity_fn_name": "hamming",
+    },
+    "s2_ruby-water-86": {
+        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/s2_binarized_model/ruby-water-86/checkpoint-20000",
+        "color": "#669933",
+        "similarity_fn_name": "hamming",
+    },
+    # "granite-embedding-small-english-r2": {
+    #     "path": "ibm-granite/granite-embedding-small-english-r2",
+    #     "color": "#bcbd22",
+    #     "model_config": {
+    #         "torch_dtype": torch.float16,
+    #     },
+    # },
     # "granite-embedding-english-r2": {
     #     "path": "ibm-granite/granite-embedding-english-r2",
     #     "color": "#6e9944"
     # },
-    "s3_firm-dust-7": {
-        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/stage3_models/firm-dust-7/checkpoint-12782",
-        "color": "#ff4a0e",
-    },
-    "s3_twilight-forest-14_(granite_small_r2)": {
-        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/"
-        "stage3_models/twilight-forest-14/checkpoint-3000",
-        "color": "#036b71",
-        "model_config": {
-            "torch_dtype": torch.float16,
-        },
-    },
-    "codebert-base": {
-        "path": "microsoft/codebert-base",
-        "color": "#9933aa",
-    },
-    "CodeBERTa-small-v1": {
-        "path": "huggingface/CodeBERTa-small-v1",
-        "color": "#1166cc",
-    },
+    # "s3_firm-dust-7": {
+    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/stage3_models/firm-dust-7/checkpoint-12782",
+    #     "color": "#ff4a0e",
+    # },
+    # "s3_twilight-forest-14_3k(granite_small_r2)": {
+    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/"
+    #     "stage3_models/twilight-forest-14/checkpoint-3000",
+    #     "color": "#036b71",
+    #     "model_config": {
+    #         "torch_dtype": torch.float16,
+    #     },
+    # },
+    # "s3_twilight-forest-14_102k(granite_small_r2)": {
+    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/stage3_models/twilight-forest-14/checkpoint-102257",
+    #     "color": "#136b71",
+    #     "model_config": {
+    #         "torch_dtype": torch.float16,
+    #     },
+    # },
+    # "s3_amber-thunder-15": {
+    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/stage3_models/amber-thunder-15/checkpoint-12991",
+    #     "color": "#32490e",
+    # },
+    # "codebert-base": {
+    #     "path": "microsoft/codebert-base",
+    #     "color": "#9933aa",
+    # },
+    # "CodeBERTa-small-v1": {
+    #     "path": "huggingface/CodeBERTa-small-v1",
+    #     "color": "#1166cc",
+    # },
     # "jina-code-embeddings-0.5b": {
     #     "path": "jinaai/jina-code-embeddings-0.5b",
     #     "color": "#CB1B88",
@@ -373,12 +421,26 @@ dataset_config = {
             "qrels/nasa_science_class_code_identifier_heldout.tsv",
             "qrels/nasa_science_function_code_docstring_heldout.tsv",
             "qrels/nasa_science_function_code_identifier_heldout.tsv",
+            "qrels/python.tsv",
+            "qrels/java.tsv",
+            "qrels/javascript.tsv",
+            "qrels/c.tsv",
+            "qrels/c++.tsv",
+            "qrels/fortran.tsv",
+            "qrels/matlab.tsv",
         ],
         "data_files_colors": [
             "#1f77b4",  # nasa_science_class_code_docstring_heldout.tsv
             "#ff7f0e",  # nasa_science_class_code_identifier_heldout.tsv
             "#2ca02c",  # nasa_science_function_code_docstring_heldout.tsv
             "#d62728",  # nasa_science_function_code_identifier_heldout.tsv
+            "#9467bd",  # python.tsv
+            "#8c564b",  # java.tsv
+            "#e377c2",  # javascript.tsv
+            "#7f7f7f",  # c.tsv
+            "#bcbd22",  # c++.tsv
+            "#17becf",  # fortran.tsv
+            "#aec7e8",  # matlab.tsv
         ],
     },
     "codesearchnet_testset_benchmark_v0.2": {
@@ -557,7 +619,8 @@ def get_evaluator(
             **{"cosine": MultiGPUInformationRetrievalEvaluator(**args)},
             **{
                 name: MultiGPUInformationRetrievalEvaluator(
-                    **args, score_functions={name: fn}
+                    **args,
+                    score_functions={name: fn},
                 )
                 for name, fn in similarity_fns.items()
             },
@@ -584,7 +647,8 @@ def get_evaluator(
             **{"cosine": MultiGPUInformationRetrievalEvaluator(**args)},
             **{
                 name: MultiGPUInformationRetrievalEvaluator(
-                    **args, score_functions={name: fn}
+                    **args,
+                    score_functions={name: fn},
                 )
                 for name, fn in similarity_fns.items()
             },
@@ -611,7 +675,8 @@ def get_evaluator(
             **{"cosine": MultiGPUInformationRetrievalEvaluator(**args)},
             **{
                 name: MultiGPUInformationRetrievalEvaluator(
-                    **args, score_functions={name: fn}
+                    **args,
+                    score_functions={name: fn},
                 )
                 for name, fn in similarity_fns.items()
             },
@@ -622,6 +687,8 @@ def get_evaluator(
         "shortform-fullform",
         "nasa_sde_ir_v4",
         "nasa_repo_code_benchmark_v0.1",
+        "nasa_repo_code_benchmark_v0.2",
+        "nasa_repo_code_benchmark_v0.3",
         "codesearchnet_testset_benchmark_v0.1",
         "codesearchnet_testset_benchmark_v0.2",
     ]:
@@ -645,7 +712,8 @@ def get_evaluator(
             **{"cosine": MultiGPUInformationRetrievalEvaluator(**args)},
             **{
                 name: MultiGPUInformationRetrievalEvaluator(
-                    **args, score_functions={name: fn}
+                    **args,
+                    score_functions={name: fn},
                 )
                 for name, fn in similarity_fns.items()
             },
@@ -672,7 +740,8 @@ def get_evaluator(
             **{"cosine": MultiGPUInformationRetrievalEvaluator(**args)},
             **{
                 name: MultiGPUInformationRetrievalEvaluator(
-                    **args, score_functions={name: fn}
+                    **args,
+                    score_functions={name: fn},
                 )
                 for name, fn in similarity_fns.items()
             },
@@ -686,12 +755,12 @@ def add_mean_metrics(all_results, query_counts, mean_basis="subset"):
     for model_name in all_results:
 
         similarity_fn_names = set(
-            [i.split("_")[-2] for i in all_results[model_name].keys()]
+            [i.split("_")[-2] for i in all_results[model_name].keys()],
         )
         if len(similarity_fn_names) > 1:
             raise ValueError(
                 f"Multiple similarity functions found for {model_name}: "
-                f"{similarity_fn_names}. Please handle manually. Skipping..."
+                f"{similarity_fn_names}. Please handle manually. Skipping...",
             )
 
         similarity_fn_name = similarity_fn_names.pop()
@@ -741,7 +810,7 @@ def add_mean_metrics(all_results, query_counts, mean_basis="subset"):
                 except KeyError:
                     print(
                         f"Key {_key_name} not found in results for model {model_name}. "
-                        f"Found only {list(all_results[model_name].keys())}. Skipping..."
+                        f"Found only {list(all_results[model_name].keys())}. Skipping...",
                     )
                     continue
                 weight_key = "__".join(_key_name.split("__")[:2])
@@ -856,9 +925,9 @@ def pre_compute_corpus_embedding(
         end_time = time.time()
         time_taken[model_name][f"{dataset_name}__{subset}"] = end_time - start_time
 
-        corpus_pre_computed_embeddings[f"{dataset_name}__{subset}__{model_name}"] = (
-            corpus_embeddings
-        )
+        corpus_pre_computed_embeddings[
+            f"{dataset_name}__{subset}__{model_name}"
+        ] = corpus_embeddings
 
     return corpus_pre_computed_embeddings, time_taken
 
@@ -897,29 +966,32 @@ def load_model_with_proper_pooling(model_name, model_info):
             word_embedding_dimension=transformer_layer.get_word_embedding_dimension(),
             pooling_mode=model_info["pooling_mode"],  # Use the mode from our config
         )
+
+        base_model = SentenceTransformer(modules=[transformer_layer, pooling_layer])
+
         # 3. Create the final SentenceTransformer model from these two modules
         if model_info.get("similarity_fn_name") == "hamming":
             print(f"Using UBinarySentenceTransformer for {model_name}")
-            model = UBinarySentenceTransformer(
-                modules=[transformer_layer, pooling_layer]
-            )
+            model = UBinarySentenceTransformer(modules=base_model._modules.values())
         else:
             print(f"Using SentenceTransformer for {model_name}")
-            model = SentenceTransformer(modules=[transformer_layer, pooling_layer])
+            model = base_model
 
     else:
+        base_model = SentenceTransformer(
+            model_info["path"],
+            model_kwargs=model_info.get("model_config", {}),
+        )
         # This is the default behavior for all other models
         print(f"Loading {model_name} with default pooling...")
         if model_info.get("similarity_fn_name") == "hamming":
             print(f"Using UBinarySentenceTransformer for {model_name}")
             model = UBinarySentenceTransformer(
-                model_info["path"], model_kwargs=model_info.get("model_config", {})
+                modules=base_model._modules.values(),
             )
         else:
             print(f"Using SentenceTransformer for {model_name}")
-            model = SentenceTransformer(
-                model_info["path"], model_kwargs=model_info.get("model_config", {})
-            )
+            model = base_model
 
     return model
 
@@ -982,7 +1054,7 @@ def evaluate():
                     continue
                 model = load_model_with_proper_pooling(model_name, model_info)
                 results = evaluators.get(
-                    model_info.get("similarity_fn_name", "cosine")
+                    model_info.get("similarity_fn_name", "cosine"),
                 )(
                     model,
                     query_prompt_str=model_info.get("query_prompt", None),
@@ -1034,7 +1106,7 @@ def evaluate():
                     pd.DataFrame,
                 ):
                     results = evaluators.get(
-                        model_info.get("similarity_fn_name", "cosine")
+                        model_info.get("similarity_fn_name", "cosine"),
                     )(
                         model=dummy_model,
                         corpus_df=corpus_df,
@@ -1042,7 +1114,7 @@ def evaluate():
                     )
                 elif isinstance(corpus_df, dict) and isinstance(queries_df, dict):
                     results = evaluators.get(
-                        model_info.get("similarity_fn_name", "cosine")
+                        model_info.get("similarity_fn_name", "cosine"),
                     )(
                         model=dummy_model,
                         corpus_dfs=corpus_df,
