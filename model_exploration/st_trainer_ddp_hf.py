@@ -47,7 +47,7 @@ from transformers.optimization import get_scheduler  # For fallback in custom tr
 from utils import (  # build_dataset_configs_s1,; build_dataset_configs_s2,
     BinarizationLayer,
     PreTokenizedCollator,
-    build_dataset_configs_s3,
+    build_dataset_configs_s2,
     get_gpu_info,
     hamming_sim,
     load_and_cache_datasets,
@@ -75,6 +75,12 @@ parser.add_argument(
     type=str,
     default="online",
     choices=["online", "offline", "disabled"],
+)
+parser.add_argument(
+    "--wb_project",
+    type=str,
+    default="nasa-indus-sde-s3",
+    choices=["nasa-indus-sde-s1", "nasa-indus-sde-s2", "nasa-indus-sde-s3"],
 )
 parser.add_argument("--resume_checkpoint_path", type=str, default=None)
 parser.add_argument("--resume_run_id", type=str, default=None)
@@ -152,11 +158,12 @@ WARMUP_RATIO = args.warmup_ratio
 EVAL_AND_SAVE_STEPS = args.eval_and_save_steps
 MAX_DATAPOINTS_PER_SRC_FOR_EVAL = args.max_datapoints_per_src_for_eval
 N_DATA_SRC = args.n_data_src
-CACHE_DIR = f"../data/stage3_cache/NROWS_{NROWS}"
+CACHE_DIR = f"../data/stage2_cache/NROWS_{NROWS}"
 GRADIENT_ACCUMULATION_STEPS = args.gradient_accumulation_steps
 LEARNING_RATE = args.lr
 PRETOKENIZE = args.pretokenize
 BAT = args.bat
+WB_PROJECT = args.wb_project
 
 # Store new custom scheduler args
 CUSTOM_LR_SCHEDULER_ENABLED = args.custom_lr_scheduler
@@ -445,7 +452,7 @@ def initilize_model(local_rank):
 def main(local_rank, rank):
     global args
     model = initilize_model(local_rank)
-    configs = build_dataset_configs_s3(N_DATA_SRC)
+    configs = build_dataset_configs_s2(N_DATA_SRC)
     ds_dict = load_and_cache_datasets(configs, CACHE_DIR, NROWS, rank)
 
     if PRETOKENIZE:
@@ -616,7 +623,7 @@ if __name__ == "__main__":
             assert RESUME_RUN_ID is not None
             wandb.init(
                 entity="impact-ibm-collaboration",
-                project="nasa-indus-sde-s3",
+                project=WB_PROJECT,
                 mode=WB_MODE,
                 id=RESUME_RUN_ID,
                 resume="must",
@@ -627,7 +634,7 @@ if __name__ == "__main__":
         else:
             wandb.init(
                 entity="impact-ibm-collaboration",
-                project="nasa-indus-sde-s3",
+                project=WB_PROJECT,
                 mode=WB_MODE,
                 # group="ddp_run",
                 # job_type="train",

@@ -201,7 +201,7 @@ def build_dataset_configs_s2(N_DATA_SRC=None) -> dict:
             "args": {"path": "nasa-impact/nasa-sde-st-corpus"},
             "map_fn": lambda ex: {"anchor": ex["query"], "positive": ex["context"]},
             "loss": MultipleNegativesRankingLoss,
-            "weight": 41,  # Optional weight for sampling this datadet when using WeightedBatchSampler; if not specified, defaults to 1.0
+            "weight": 41 * 3/4,  # Optional weight for sampling this datadet when using WeightedBatchSampler; if not specified, defaults to 1.0
         },
         "pubmed_v3": {
             "args": {"path": "../data_prep/raw/pubmed.py", "split": "train"},
@@ -532,7 +532,7 @@ def load_and_cache_datasets(configs: dict, CACHE_DIR, NROWS=None, rank=None) -> 
         cache_path = os.path.join(CACHE_DIR, name)
 
         if os.path.isdir(cache_path):
-            splits = load_from_disk(cache_path, keep_in_memory=True)
+            splits = load_from_disk(cache_path, keep_in_memory=False)
         else:
             if NROWS:
                 raw = load_dataset(
@@ -1135,7 +1135,6 @@ class BinarizationLayer(nn.Module):
             "type": "BinarizationLayer",
             "version": "1.0",
         }
-
         with open(os.path.join(output_path, "config.json"), "w") as f:
             json.dump(config, f)
 
