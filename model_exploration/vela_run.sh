@@ -1,5 +1,5 @@
 torchrun --nproc_per_node=auto --master-port=29507 st_trainer_ddp_hf.py \
-    --model_name "nasa-impact/indus-sde-st-v0.1" \
+    --model_name "nasa-impact/indus-sde-st-v0.2" \
     --num_train_epochs 1 \
     --batch_size 64 \
     --gradient_accumulation_steps 6 \

@@ -52,6 +52,8 @@ from utils import (  # build_dataset_configs_s1,; build_dataset_configs_s2,
     prepare_evaluators,
 )
 
+from torch import nn
+
 # ──────────────── Constants ────────────────
 
 parser = argparse.ArgumentParser(description="Sentence Transformer Training Config")
@@ -418,8 +420,20 @@ def initilize_model(local_rank):
 
     if BAT:
         word_embedding_model = models.Transformer(MODEL_NAME)
+
+        #freeze the embedding model layers
+        for p in word_embedding_model.parameters():
+            p.requires_grad = False
+
         pooling_model = models.Pooling(
             word_embedding_model.get_word_embedding_dimension(),
+        )
+
+        #dense layer where the model learn binarization trick
+        dense_model = models.Dense(
+            in_features=word_embedding_model.get_word_embedding_dimension(),
+            out_features=768,
+            activation_function=nn.ReLU()  # 'tanh', 'sigmoid'
         )
 
         # Add our custom binarization layer after the pooling layer
@@ -430,6 +444,7 @@ def initilize_model(local_rank):
             modules=[
                 word_embedding_model,
                 pooling_model,
+                dense_model,
                 binarization_model,
             ],
             device=f"cuda:{local_rank}",
