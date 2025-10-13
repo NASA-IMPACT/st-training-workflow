@@ -558,8 +558,8 @@ def main(local_rank, rank):
     }
 
     # loss functions
-    loss_sim_fun = hamming_sim if BAT else util.cos_sim
-    # loss_sim_fun = util.cos_sim
+    #loss_sim_fun = hamming_sim if BAT else util.cos_sim
+    loss_sim_fun = util.cos_sim
     loss_funs = {
         n: cfg["loss"](model, similarity_fct=loss_sim_fun) for n, cfg in configs.items()
     }

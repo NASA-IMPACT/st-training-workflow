@@ -197,12 +197,12 @@ def build_dataset_configs_s2(N_DATA_SRC=None) -> dict:
         }
 
     base = {
-        "nasa-sde-st": {
-            "args": {"path": "nasa-impact/nasa-sde-st-corpus"},
-            "map_fn": lambda ex: {"anchor": ex["query"], "positive": ex["context"]},
-            "loss": MultipleNegativesRankingLoss,
-            "weight": 41 / 2,  # Optional weight for sampling this datadet when using WeightedBatchSampler; if not specified, defaults to 1.0
-        },
+        # "nasa-sde-st": {
+        #     "args": {"path": "nasa-impact/nasa-sde-st-corpus"},
+        #     "map_fn": lambda ex: {"anchor": ex["query"], "positive": ex["context"]},
+        #     "loss": MultipleNegativesRankingLoss,
+        #     "weight": 41 / 2,  # Optional weight for sampling this datadet when using WeightedBatchSampler; if not specified, defaults to 1.0
+        # },
         "pubmed_v3": {
             "args": {"path": "../data_prep/raw/pubmed.py", "split": "train"},
             "map_fn": process_pubmed,
