@@ -201,13 +201,13 @@ def build_dataset_configs_s2(N_DATA_SRC=None) -> dict:
             "args": {"path": "nasa-impact/nasa-sde-st-corpus"},
             "map_fn": lambda ex: {"anchor": ex["query"], "positive": ex["context"]},
             "loss": MultipleNegativesRankingLoss,
-            #"weight": 41 / 2,  # Optional weight for sampling this datadet when using WeightedBatchSampler; if not specified, defaults to 1.0
+            "weight": 41 * 3/4,  # Optional weight for sampling this datadet when using WeightedBatchSampler; if not specified, defaults to 1.0
         },
         "pubmed_v3": {
             "args": {"path": "../data_prep/raw/pubmed.py", "split": "train"},
             "map_fn": process_pubmed,
             "loss": MultipleNegativesRankingLoss,
-            #"weight": 41 / 24,
+            "weight": 41 / 24,
         },
         "arxiv_title_abstract": {
             "args": {
@@ -216,7 +216,7 @@ def build_dataset_configs_s2(N_DATA_SRC=None) -> dict:
             },
             "map_fn": lambda ex: {"anchor": ex["title"], "positive": ex["abstract"]},
             "loss": MultipleNegativesRankingLoss,
-            #"weight": 41 / 2.7,
+            "weight": 41 / 2.7,
         },
         "nasa_ads": {
             "args": {"path": "nasa-impact/nasa_ads_corpus", "data_files": "*.jsonl.gz"},
@@ -225,7 +225,7 @@ def build_dataset_configs_s2(N_DATA_SRC=None) -> dict:
                 "positive": ex["positives"]["docs"][0],
             },
             "loss": MultipleNegativesRankingLoss,
-            #"weight": 41 / 2.66,
+            "weight": 41 / 2.66,
         },
         "s2orc_title_abstract": {
             "args": {
@@ -235,7 +235,7 @@ def build_dataset_configs_s2(N_DATA_SRC=None) -> dict:
             },
             "map_fn": lambda ex: {"anchor": ex["title"], "positive": ex["abstract"]},
             "loss": MultipleNegativesRankingLoss,
-            #"weight": 1,
+            "weight": 1,
         },
         # "s2orc_abstract_citation": {
         #     "args": {
@@ -267,13 +267,13 @@ def build_dataset_configs_s2(N_DATA_SRC=None) -> dict:
                 "negative": ex["negative"],
             },
             "loss": MultipleNegativesRankingLoss,
-            #"weight": 41 / 5,
+            "weight": 41 / 5,
         },
         "stage1_pairs": {
             "args": {"path": "stage1/stage1_pairs"},
             "map_fn": lambda ex: {"anchor": ex["query"], "positive": ex["context"]},
             "loss": MultipleNegativesRankingLoss,
-            #"weight": 1,  # sample from stage1
+            "weight": 1,  # sample from stage1
         },
         # "pmc": {
         #     "args": {"path": "../data_prep/raw/pmc_open_access.py", "split": "train"},
