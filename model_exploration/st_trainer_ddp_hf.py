@@ -91,6 +91,7 @@ parser.add_argument("--eval_and_save_steps", type=int, default=1000)
 parser.add_argument("--max_datapoints_per_src_for_eval", type=int, default=20)
 parser.add_argument("--gradient_accumulation_steps", type=int, default=8)
 parser.add_argument("--lr", type=float, default=2e-5)
+parser.add_argument("--weight_decay", type=float, default=0.1)
 parser.add_argument(
     "--pretokenize",
     action="store_true",
@@ -164,6 +165,7 @@ LEARNING_RATE = args.lr
 PRETOKENIZE = args.pretokenize
 BAT = args.bat
 WB_PROJECT = args.wb_project
+WEIGHT_DECAY = args.weight_decay
 
 # Store new custom scheduler args
 CUSTOM_LR_SCHEDULER_ENABLED = args.custom_lr_scheduler
@@ -199,6 +201,7 @@ wandb_config = {
     "pretokenization": PRETOKENIZE,
     "lr_max (initial_lr)": LEARNING_RATE,
     "BAT - Binarization Aware Training": BAT,
+    "WEIGHT_DECAY": WEIGHT_DECAY,
 }
 
 if CUSTOM_LR_SCHEDULER_ENABLED:
@@ -547,6 +550,7 @@ def main(local_rank, rank):
         report_to="wandb",
         local_rank=local_rank,
         ignore_data_skip=True,
+        weight_decay=WEIGHT_DECAY,
     )
 
     # Prepare custom_lr_params dictionary to pass to the custom trainer
@@ -558,8 +562,8 @@ def main(local_rank, rank):
     }
 
     # loss functions
-    loss_sim_fun = hamming_sim if BAT else util.cos_sim
-    # loss_sim_fun = util.cos_sim
+    # loss_sim_fun = hamming_sim if BAT else util.cos_sim
+    loss_sim_fun = util.cos_sim
     loss_funs = {
         n: cfg["loss"](model, similarity_fct=loss_sim_fun) for n, cfg in configs.items()
     }
