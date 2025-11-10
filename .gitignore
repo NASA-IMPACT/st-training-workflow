@@ -186,3 +186,5 @@ wandb
 *tmp_models*
 training_output
 .venv*/
+
+eval/

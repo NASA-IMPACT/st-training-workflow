@@ -158,6 +158,69 @@ def build_dataset_configs_s3(N_DATA_SRC=None) -> dict:
             "loss": MultipleNegativesRankingLoss,
             "weight": 1,  # Optional weight for sampling this datadet when using WeightedBatchSampler; if not specified, defaults to 1.0
         },
+        "the-vault-function": {
+            "args": {"path": "Fsoft-AIC/the-vault-function"},
+            "map_fn": lambda ex: {
+                "anchor": ex["original_docstring"],
+                "positive": ex["code"],
+            },
+            "loss": MultipleNegativesRankingLoss,
+            "weight": 1,  # Optional weight for sampling this datadet when using WeightedBatchSampler; if not specified, defaults to 1.0
+        },
+        "the-vault-class": {
+            "args": {"path": "Fsoft-AIC/the-vault-class"},
+            "map_fn": lambda ex: {
+                "anchor": ex["original_docstring"],
+                "positive": ex["code"],
+            },
+            "loss": MultipleNegativesRankingLoss,
+            "weight": 1,  # Optional weight for sampling this datadet when using WeightedBatchSampler; if not specified, defaults to 1.0
+        },
+    }
+
+    if N_DATA_SRC is not None:
+        n_src = min(len(base), N_DATA_SRC)
+        base = {k: v for i, (k, v) in enumerate(base.items()) if i < n_src}
+
+    return base
+
+
+def build_dataset_configs_s3(N_DATA_SRC=None) -> dict:
+    """
+    Define all your dataset mappings and losses for stage 3 data.
+    """
+
+    base = {
+        "nasa-science-function-code-docstring": {
+            "args": {"path": "nasa-impact/nasa-science-function-code-docstring"},
+            "map_fn": lambda ex: {
+                "anchor": ex["original_docstring"],
+                "positive": ex["code"],
+            },
+            "loss": MultipleNegativesRankingLoss,
+            "weight": 1,  # Optional weight for sampling this datadet when using WeightedBatchSampler; if not specified, defaults to 1.0
+        },
+        "nasa-science-class-code-docstring": {
+            "args": {"path": "nasa-impact/nasa-science-class-code-docstring"},
+            "map_fn": lambda ex: {
+                "anchor": ex["original_docstring"],
+                "positive": ex["code"],
+            },
+            "loss": MultipleNegativesRankingLoss,
+            "weight": 1,  # Optional weight for sampling this datadet when using WeightedBatchSampler; if not specified, defaults to 1.0
+        },
+        "nasa-science-function-code-identifier": {
+            "args": {"path": "nasa-impact/nasa-science-function-code-identifier"},
+            "map_fn": lambda ex: {"anchor": ex["identifier"], "positive": ex["code"]},
+            "loss": MultipleNegativesRankingLoss,
+            "weight": 1,  # Optional weight for sampling this datadet when using WeightedBatchSampler; if not specified, defaults to 1.0
+        },
+        "nasa-science-class-code-identifier": {
+            "args": {"path": "nasa-impact/nasa-science-class-code-identifier"},
+            "map_fn": lambda ex: {"anchor": ex["identifier"], "positive": ex["code"]},
+            "loss": MultipleNegativesRankingLoss,
+            "weight": 1,  # Optional weight for sampling this datadet when using WeightedBatchSampler; if not specified, defaults to 1.0
+        },
         # "the-vault-function": {
         #     "args": {"path": "Fsoft-AIC/the-vault-function"},
         #     "map_fn": lambda ex: {"anchor": ex["original_docstring"], "positive": ex["code"]},
@@ -201,7 +264,9 @@ def build_dataset_configs_s2(N_DATA_SRC=None) -> dict:
             "args": {"path": "nasa-impact/nasa-sde-st-corpus"},
             "map_fn": lambda ex: {"anchor": ex["query"], "positive": ex["context"]},
             "loss": MultipleNegativesRankingLoss,
-            "weight": 41 * 3/4,  # Optional weight for sampling this datadet when using WeightedBatchSampler; if not specified, defaults to 1.0
+            "weight": 41
+            * 3
+            / 4,  # Optional weight for sampling this datadet when using WeightedBatchSampler; if not specified, defaults to 1.0
         },
         "pubmed_v3": {
             "args": {"path": "../data_prep/raw/pubmed.py", "split": "train"},
