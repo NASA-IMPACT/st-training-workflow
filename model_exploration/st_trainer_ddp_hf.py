@@ -6,7 +6,6 @@ import os
 import random
 import time
 from typing import Dict, Union
-
 import distributed
 import torch
 import wandb
@@ -159,7 +158,7 @@ WARMUP_RATIO = args.warmup_ratio
 EVAL_AND_SAVE_STEPS = args.eval_and_save_steps
 MAX_DATAPOINTS_PER_SRC_FOR_EVAL = args.max_datapoints_per_src_for_eval
 N_DATA_SRC = args.n_data_src
-CACHE_DIR = f"../data/stage3_cache/NROWS_{NROWS}"
+CACHE_DIR = f"../data/stage2_cache/NROWS_{NROWS}"
 GRADIENT_ACCUMULATION_STEPS = args.gradient_accumulation_steps
 LEARNING_RATE = args.lr
 PRETOKENIZE = args.pretokenize
@@ -562,11 +561,7 @@ def main(local_rank, rank):
     }
 
     # loss functions
-<<<<<<< HEAD
     # loss_sim_fun = hamming_sim if BAT else util.cos_sim
-=======
-    #loss_sim_fun = hamming_sim if BAT else util.cos_sim
->>>>>>> refs/remotes/origin/develop
     loss_sim_fun = util.cos_sim
     loss_funs = {
         n: cfg["loss"](model, similarity_fct=loss_sim_fun) for n, cfg in configs.items()
