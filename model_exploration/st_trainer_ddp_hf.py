@@ -90,7 +90,7 @@ parser.add_argument("--eval_and_save_steps", type=int, default=1000)
 parser.add_argument("--max_datapoints_per_src_for_eval", type=int, default=20)
 parser.add_argument("--gradient_accumulation_steps", type=int, default=8)
 parser.add_argument("--lr", type=float, default=2e-5)
-parser.add_argument("--weight_decay", type=float, default=0.1)
+parser.add_argument("--weight_decay", type=float, default=0.5)
 parser.add_argument(
     "--pretokenize",
     action="store_true",
