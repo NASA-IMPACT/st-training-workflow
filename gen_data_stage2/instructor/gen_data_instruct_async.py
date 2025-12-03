@@ -1,6 +1,7 @@
 import asyncio
 import os
 import time
+from enum import Enum
 from typing import List
 
 import httpx
@@ -16,6 +17,14 @@ from tqdm import tqdm
 from tqdm.asyncio import tqdm_asyncio
 
 load_dotenv(override=True)
+
+
+# --- Quality Enum ---
+class Quality(str, Enum):
+    low = "low"
+    medium = "medium"
+    high = "high"
+
 
 # --- Pydantic Models (Unchanged) ---
 class QueryContextPair(BaseModel):
@@ -55,6 +64,14 @@ class DatasetGeneration(BaseModel):
         ...,
         description=("A curated list of high-relevance search terms"),
     )
+    quality: Quality = Field(
+        ...,
+        description=(
+            "A single quality label for the provided text: one of 'low', 'medium', or 'high'.\n"
+            "Use this to indicate whether the text contains high-quality NASA scientific content (high),"
+            " some scientific content but noisy or mixed (medium), or is non-scientific / metadata / directory listings (low)."
+        ),
+    )
 
 
 # --- Asynchronous Processing Function (Updated for token usage) ---
@@ -71,12 +88,13 @@ async def async_process_dataset_gen(
     Uses a semaphore to limit concurrent API calls and extracts token usage.
     """
     system_prompt = f"""
-    **Your Task:** From the provided text, generate two outputs in the required JSON format:
+    **Your Task:** From the provided text, generate three outputs in the required JSON format:
     1. A list of `QueryContextPair` objects.
     2. A list of `search_terms`.
+    3. A single field named `quality` with one of the strings: `low`, `medium`, or `high`.
 
     **Quantity Guidelines:**
-    Generate a list of `QueryContextPair` objects and `search_terms` each. The ideal quantity for each list is **between 5 and 15**. Your goal is to produce the highest possible quality output. Therefore, **intelligently determine the appropriate number of items within this 5-15 range based on the richness and density of the provided text.**
+    Generate a list of `QueryContextPair` objects and `search_terms` each. The ideal quantity for each list is **between {min_nq} and {max_nq}. Your goal is to produce the highest possible quality output. Therefore, **intelligently determine the appropriate number of items within this {min_nq} - {max_nq} range based on the richness and density of the provided text.**
 
     **Requirements for Queries (within QueryContextPair):**
     * **Grounded:** Every question MUST be answerable using ONLY the provided `context`. Do not use external knowledge.
@@ -115,7 +133,20 @@ async def async_process_dataset_gen(
 
     Create high-quality datasets for Information Retrieval, specifically tailored for the NASA Science Discovery Engine
 
-    """
+
+    Additionally, for the entire provided text return a single field named `quality` with one of the values: `low`, `medium`, or `high`.
+    - `high`: The text is high-quality scientific content relevant to NASA (missions, instruments, observations, methods, results,
+        numeric findings, datasets, or analysis). AND you were able to produce a robust set of high-quality QueryContextPair objects and precise search_terms (diverse, grounded, within requested counts)
+    - `medium`: Some scientific content present but the text is noisy, contains mixed content, or includes formatting/metadata that
+        reduces its usefulness for scientific QA/search pair generation.
+    - `low`: The text is non-scientific (directory listings, HTML indexes, file metadata, generic web content) OR it is primarily computer-science / software-engineering content (NOT NASA science). You were unable to create useful QA/search pairs that meet the requirements.
+
+    IMPORTANT:
+      - We expect NASA-related scientific text. Do NOT mark computer science or generic web directory/index pages as scientific.
+      - The `quality` value must be exactly one of these strings: `low`, `medium`, or `high`.
+      - If the text is NASA-related but you cannot create the required grounded QA/search pairs (e.g., because the text is too fragmented or mostly metadata), label it `medium` or `low` accordingly.
+
+        """
 
     async with semaphore:
         try:
@@ -135,6 +166,15 @@ async def async_process_dataset_gen(
             query = [pair.query for pair in user_info.question_context]
             contexts = [pair.context for pair in user_info.question_context]
             search_terms = user_info.search_terms
+            # Quality may be a Pydantic/Enum value; normalize to string
+            quality_val = None
+            try:
+                q = getattr(user_info, "quality", None)
+                if q is not None:
+                    # If it's an Enum, get its value; otherwise str()
+                    quality_val = getattr(q, "value", str(q))
+            except Exception:
+                quality_val = None
 
             # Safely extract token usage from the raw response
             # This works for OpenAI models; local models might not provide it.
@@ -148,6 +188,7 @@ async def async_process_dataset_gen(
                     query,
                     contexts,
                     search_terms,
+                    quality_val,
                     request_tokens,
                     response_tokens,
                     total_tokens,
@@ -157,7 +198,7 @@ async def async_process_dataset_gen(
 
         except Exception as e:
             print(f"Error processing text: {text[:100]}... | Error: {e}")
-            return pd.Series([[], [], [], None, None, None, None])
+            return pd.Series([[], [], [], None, None, None, None, None])
 
 
 # --- Main Asynchronous Function (Updated for Universal Client) ---
@@ -206,6 +247,25 @@ async def generate_dataset_with_resume(
 
     # --- UNIVERSAL CLIENT and Semaphore Setup ---
     print(f"Initializing client for model: {model_name}")
+    # try:
+    #     aclient = instructor.from_openai(
+    #         AsyncOpenAI(
+    #             base_url="http://localhost:11434/v1",
+    #             api_key="ollama",  # Required by library, but not used by Ollama
+    #             http_client=httpx.AsyncClient(
+    #                 timeout=120.0,
+    #             ),  # Longer timeout for local models
+    #         ),
+    #     )
+    #     print("Trying to use local model client (Ollama).")
+    # except:
+    #     if not os.getenv("OPENAI_API_KEY"):
+    #         raise ValueError(
+    #             "OPENAI_API_KEY not found in environment variables. Please set it in your .env file.",
+    #         )
+    #     aclient = instructor.from_openai(AsyncOpenAI())
+    #     print("Using OpenAI client.")
+
     if model_name.startswith("gpt-"):
         # For OpenAI models, uses API key from environment variables
         if not os.getenv("OPENAI_API_KEY"):
@@ -257,6 +317,7 @@ async def generate_dataset_with_resume(
             "questions",
             "context",
             "search_terms",
+            "quality",
             "request_tokens",
             "response_tokens",
             "total_tokens",
@@ -282,17 +343,19 @@ async def main():
     """Main execution function."""
     # data_path = "/rhome/sawale/indus_traning/sentense_transformers/gen_data_stage3/filtered_sde_data/"
     # data_path = "/rhome/sawale/indus_traning/sentense_transformers/gen_data_stage3/samplw_2k_per_division.parquet"
-    data_path = "/rhome/sawale/indus_traning/sentense_transformers/data/stage2_sde/cmr_pairs.parquet"
+    # data_path = "/rhome/sawale/indus_traning/sentense_transformers/data/stage2_sde/cmr_pairs.parquet"
+    data_path = "/rhome/sawale/indus_traning/sentense_transformers/data/sde_new_dump/filtered_sde_20251024_dump_with_prob.parquet"
+
     df = pd.read_parquet(
         data_path,
-        columns=["id", "url1", "title", "text", "prob_included"],
+        columns=["id", "url1", "title", "text", "prob"],
     )
     # df = df.sort_values(by='prob_included', ascending=False)
     print(f"Original Shape of data: {df.shape}")
 
     # --- CHOOSE YOUR MODEL ---
     # For OpenAI (ensure OPENAI_API_KEY is in your .env file)
-    # model_name = "llama3.2:3b"
+    # model_name = "gpt-oss:20b"
     model_name = "gpt-4o-mini"
 
     # For a local model via Ollama
@@ -302,9 +365,9 @@ async def main():
     processed_df = await generate_dataset_with_resume(
         df,
         model_name=model_name,
-        nrows=None,
-        output_folder="data_v3/",
-        batch_size=100,
+        nrows=10000,
+        output_folder="sdev2_test2/",
+        batch_size=50,
         concurrency_limit=50,  # OpenAI rate limits are often higher, you might increase this
         min_nq=5,
         max_nq=15,
