@@ -418,6 +418,7 @@ class CustomSentenceTransformerTrainer(SentenceTransformerTrainer):
 
 def initilize_model(local_rank):
     global BAT, MODEL_NAME, MODEL_MAX_LEN
+    from torch import nn
 
     if BAT:
         word_embedding_model = models.Transformer(MODEL_NAME)
@@ -426,7 +427,12 @@ def initilize_model(local_rank):
         )
 
         # Add our custom binarization layer after the pooling layer
-        binarization_model = BinarizationLayer()
+        #binarization_model = BinarizationLayer()
+        binarization_model = models.Dense(
+            pooling_model.pooling_output_dimension,
+            pooling_model.pooling_output_dimension,
+            activation_function= nn.Tanh()
+        )
 
         # Create the final model by sequencing the layers
         model = SentenceTransformer(

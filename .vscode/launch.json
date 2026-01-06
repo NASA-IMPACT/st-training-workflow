@@ -1,0 +1,60 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    
+"configurations": [
+    {
+      "name": "DDP Debug (torch.distributed.run)",
+      "type": "debugpy",
+      "request": "launch",
+
+      // Use the module that backs torchrun
+      "module": "torch.distributed.run",
+
+      // Working directory — adjust if needed
+      "cwd": "${workspaceFolder}",
+
+      // Equivalent to: torchrun --nproc_per_node=auto --master-port=29507 st_trainer_ddp_hf.py ...
+      "args": [
+        "--nproc_per_node=auto",
+        "--master_port=29507",
+        // If you want standalone single-node setup:
+        // "--standalone",
+        "model_exploration/st_trainer_ddp_hf.py",
+        "--model_name", "nasa-impact/indus-sde-st-v0.1",
+        "--num_train_epochs", "1",
+        "--batch_size", "64",
+        "--gradient_accumulation_steps", "6",
+        "--lr", "4e-5",
+        "--eval_and_save_steps", "500",
+        "--output_base", "../training_output",
+        "--max_datapoints_per_src_for_eval", "1000",
+        "--warmup_ratio", "0.02",
+        "--cosine_cycle_steps_custom", "2000",
+        "--wb_project", "nasa-indus-sde-s2",
+        "--wb_mode", "offline",
+        "--bat"
+      ],
+
+      // Let the debugger attach to child ranks
+      "subProcess": true,
+      "justMyCode": false,
+      "console": "integratedTerminal",
+
+      // Helpful env
+      "env": {
+        "MASTER_PORT": "29507",
+        "WANDB_MODE": "offline",
+        // Uncomment if you want DDP diagnostics
+        // "TORCH_DISTRIBUTED_DEBUG": "DETAIL",
+        // If CUDA selection matters:
+        "CUDA_VISIBLE_DEVICES": "0"
+      }
+
+      // Optionally, you can add "redirectOutput": true if needed
+    }
+  ]
+
+}
