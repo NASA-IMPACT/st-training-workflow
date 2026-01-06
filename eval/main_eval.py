@@ -7,6 +7,7 @@ from collections import defaultdict
 from string import Template
 
 import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
 import pandas as pd
 import seaborn as sns
 import torch
@@ -42,19 +43,22 @@ parser.add_argument(
         "nasa_sde_ir_v1",
         "nasa_sde_ir_v2",
         "nasa_sde_ir_v3",
+        "nasa_sde_ir_20251024_v5",
         "nasa_sde_ir_v4",
         "nasa_smd_ir",
         "shortform-fullform",
         "nasa_repo_code_benchmark_v0.1",
         "codesearchnet_testset_benchmark_v0.2",
         "codesearchnet_testset_benchmark_v0.1",
+        "code_repo_search_benchmark_v1"
     ],
 )
 parser.add_argument("--ks", nargs="*", default=[1, 3, 5, 10])
+parser.add_argument("--plotks", nargs="*", default=[1, 3, 5, 10])
 parser.add_argument("--json_output_path", type=str, default="results_json/")
 parser.add_argument("--output_dir_plots", type=str, default="results_plots/")
 parser.add_argument("--json_time_path", type=str, default="results_times/")
-parser.add_argument("--batch_size", type=int, default=4)
+parser.add_argument("--batch_size", type=int, default=1)
 parser.add_argument(
     "--just_plot",
     type=int,
@@ -65,7 +69,7 @@ parser.add_argument(
 parser.add_argument(
     "--desired_metric_types",
     nargs="+",
-    default=["mrr", "ndcg"],
+    default=["mrr"],
     help="A list of metrics to plot (e.g., mrr, accuracy, ndcg, precision, recall, map).",
 )
 
@@ -74,6 +78,7 @@ args = parser.parse_args()
 
 dataset_name = args.dataset_name
 ks = args.ks
+plotks = [int(k) for k in args.plotks]
 json_output_path = args.json_output_path
 json_time_path = args.json_time_path
 output_dir_plots = args.output_dir_plots
@@ -97,13 +102,17 @@ models = {
     "modernbert-embed-base": {
         "path": "nomic-ai/modernbert-embed-base",
         "color": "#1f77b4",
+        "hatch": "//",  # Diagonal lines
         "model_config": {
             "torch_dtype": torch.float16,
         },
+        # "display_name": "ModernBERT",
     },
     "nasa-smd-ibm-st-v2": {
         "path": "nasa-impact/nasa-smd-ibm-st-v2",
         "color": "#ff7f0e",
+        "hatch": "\\\\",  # Reverse diagonal lines
+        "display_name": "Original INDUS-ST",
     },
     # "indus-sde-st-v0.1": {"path": "nasa-impact/indus-sde-st-v0.1", "color": "#2ca02c"},
     # "indus-sde-st-v0.2_whole-moon-14": {
@@ -147,6 +156,15 @@ models = {
     "indus-sde-st-v0.2_polar-monkey-61_30k": {
         "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/model-6hjbp1bx:v1/checkpoint-30000",
         "color": "#33ff77",
+        "hatch": "...",  # Dots
+        "display_name": "INDUS-SDE",
+    },
+    "indus-sde-st-v0.2_polar-monkey-61_30k-512t": {
+        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/model-6hjbp1bx:v1/checkpoint-30000",
+        "color": "#ccff33",
+        "hatch": "...",  # Dots
+        "display_name": "INDUS-SDE-512-token",
+        "max_seq_length": 512,
     },
     # "nasa-smd-ibm-st-v2(ft_ads_sde)": {
     #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/model-xfpc778s:v1/checkpoint-1492",
@@ -170,50 +188,124 @@ models = {
     "indus-sde-st-v0.2-61_30k-ubinary_emb": {
         "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/model-6hjbp1bx:v1/checkpoint-30000",
         "color": "#9933aa",
+        "hatch": "xxx",
         "similarity_fn_name": "hamming",
+        "display_name": "INDUS-SDE-post-binarization",
     },
-    "s2_azure-eon-73": {
-        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/s2_binarized_model/azure-eon-73/checkpoint-32500",
-        "color": "#00a9ac",
-        "similarity_fn_name": "hamming",
-    },
-    "s2_cosmic-pine-77": {
-        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/s2_binarized_model/cosmic-pine-77/checkpoint-1458",
-        "color": "#008dad",
-        "similarity_fn_name": "hamming",
-    },
-    "s2_swift-morning-78": {
-        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/s2_binarized_model/swift-morning-78/checkpoint-1458",
-        "color": "#005197",
-        "similarity_fn_name": "hamming",
-    },
-    "s2_robust-firebrand-83": {
-        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/s2_binarized_model/robust-firebrand-83/checkpoint-15000",
-        "color": "#af38f5",
-        "similarity_fn_name": "hamming",
-    },
-    "s2_celestial-butterfly-84": {
-        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/s2_binarized_model/celestial-butterfly-84/checkpoint-15000",
-        "color": "#0d06ac",
-        "similarity_fn_name": "hamming",
-    },
-    "s2_absurd-snowflake-85": {
-        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/s2_binarized_model/absurd-snowflake-85/checkpoint-20000",
-        "color": "#005282",
-        "similarity_fn_name": "hamming",
-    },
+    # "s2_azure-eon-73": {
+    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/s2_binarized_model/azure-eon-73/checkpoint-32500",
+    #     "color": "#00a9ac",
+    #     "similarity_fn_name": "hamming",
+    # },
+    # "s2_cosmic-pine-77": {
+    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/s2_binarized_model/cosmic-pine-77/checkpoint-1458",
+    #     "color": "#008dad",
+    #     "similarity_fn_name": "hamming",
+    # },
+    # "s2_swift-morning-78": {
+    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/s2_binarized_model/swift-morning-78/checkpoint-1458",
+    #     "color": "#005197",
+    #     "similarity_fn_name": "hamming",
+    # },
+    # "s2_robust-firebrand-83": {
+    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/s2_binarized_model/robust-firebrand-83/checkpoint-15000",
+    #     "color": "#af38f5",
+    #     "similarity_fn_name": "hamming",
+    # },
+    # "s2_celestial-butterfly-84": {
+    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/s2_binarized_model/celestial-butterfly-84/checkpoint-15000",
+    #     "color": "#0d06ac",
+    #     "similarity_fn_name": "hamming",
+    # },
+    # "s2_absurd-snowflake-85": {
+    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/s2_binarized_model/absurd-snowflake-85/checkpoint-20000",
+    #     "color": "#005282",
+    #     "similarity_fn_name": "hamming",
+    # },
     "s2_ruby-water-86": {
         "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/s2_binarized_model/ruby-water-86/checkpoint-20000",
         "color": "#669933",
+        "hatch": "+.",
         "similarity_fn_name": "hamming",
+        "display_name": "s2-86-20k",
     },
-    # "granite-embedding-small-english-r2": {
-    #     "path": "ibm-granite/granite-embedding-small-english-r2",
-    #     "color": "#bcbd22",
-    #     "model_config": {
-    #         "torch_dtype": torch.float16,
-    #     },
+    "s2_ruby-water-86-30k": {
+        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/s2_binarized_model/ruby-water-86/checkpoint-30000",
+        "color": "#644690",
+        "hatch": "..",
+        "similarity_fn_name": "hamming",
+        "display_name": "s2-86-30k",
+    },
+    "s2_ruby-water-86-38k": {
+        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/s2_binarized_model/ruby-water-86/checkpoint-38500",
+        "color": "#7B995D",
+        "hatch": "--",
+        "similarity_fn_name": "hamming",
+        "display_name": "s2-86-38k",
+    },
+    # "s2_azure-serenity-87": {
+    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/s2_binarized_model/azure-serenity-87/checkpoint-10000",
+    #     "color": "#669999",
+    #     "similarity_fn_name": "hamming",
     # },
+    # "s2_rose-smoke-88": {
+    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/s2_binarized_model/rose-smoke-88/checkpoint-10000",
+    #     "color": "#992211",
+    #     "similarity_fn_name": "hamming",
+    # },
+    # "s2_restful-bird-93": {
+    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/s2_binarized_model/restful-bird-93/checkpoint-20000",
+    #     "color": "#997511",
+    #     "similarity_fn_name": "hamming",
+    #     "comment": "QAT: SDE weighted 41/2"
+    # },
+    # "s2_eternal-energy-94": {
+    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/s2_binarized_model/eternal-energy-94/checkpoint-27500",
+    #     "color": "#119985",
+    #     "similarity_fn_name": "hamming",
+    #     "comment": "QAT: Without SDE dataset (Just to test the performance)"
+    # },
+    # "s2_worthy-dust-96": {
+    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/s2_binarized_model/worthy-dust-96/checkpoint-15500",
+    #     "color": "#667788",
+    #     "similarity_fn_name": "hamming",
+    #     "comment": "QAT: All the stage 2 datasets are having equal weights. = 1"
+    # },
+    # "s2_wandering-snowflake-98": {
+    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/artifacts/s2_binarized_model/wandering-snowflake-98/checkpoint-20000",
+    #     "color": "#92A447",
+    #     "similarity_fn_name": "hamming",
+    #     "comment": "QAT: Uses weight_decay = 0.1"
+    # }
+
+    "granite-embedding-small-english-r2": {
+        "path": "ibm-granite/granite-embedding-small-english-r2",
+        "color": "#bcbd22",
+        "hatch": "..-",
+        "model_config": {
+            "torch_dtype": torch.float16,
+        },
+    },
+    "granite-embedding-small-english-r2-512t": {
+        "path": "ibm-granite/granite-embedding-small-english-r2",
+        "color": "#bd8422",
+        "hatch": "o--",
+        "model_config": {
+            "torch_dtype": torch.float16,
+        },
+        "max_seq_length": 512,
+        "display_name": "granite-small-english-r2-512-token",
+    },
+    "granite-embedding-small-english-r2-1024t": {
+        "path": "ibm-granite/granite-embedding-small-english-r2",
+        "color": "#bd7722",
+        "hatch": "+--",
+        "model_config": {
+            "torch_dtype": torch.float16,
+        },
+        "max_seq_length": 1024,
+        "display_name": "granite-small-english-r2-1024-token",
+    },
     # "granite-embedding-english-r2": {
     #     "path": "ibm-granite/granite-embedding-english-r2",
     #     "color": "#6e9944"
@@ -259,18 +351,18 @@ models = {
 }
 
 embeddings = {
-    "[OpenAI]text-embedding-3-small": {
-        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/openai_emb_cache/"
-        "text-embedding-3-small/",
-        "model_name": "text-embedding-3-small",
-        "color": "#17becf",
-    },
-    "[OpenAI]text-embedding-3-large": {
-        "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/openai_emb_cache/"
-        "text-embedding-3-large/",
-        "model_name": "text-embedding-3-large",
-        "color": "#393b79",
-    },
+    # "[OpenAI]text-embedding-3-small": {
+    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/openai_emb_cache/"
+    #     "text-embedding-3-small/",
+    #     "model_name": "text-embedding-3-small",
+    #     "color": "#17becf",
+    # },
+    # "[OpenAI]text-embedding-3-large": {
+    #     "path": "/rhome/sawale/indus_traning/sentense_transformers/eval/openai_emb_cache/"
+    #     "text-embedding-3-large/",
+    #     "model_name": "text-embedding-3-large",
+    #     "color": "#393b79",
+    # },
 }
 
 dataset_config = {
@@ -336,6 +428,30 @@ dataset_config = {
             "#e377c2",  # title-description~CMR.tsv
             "#7f7f7f",  # title-description~PDS.tsv
         ],
+    },
+    "nasa_sde_ir_20251024_v5": {
+        "path": "nasa-impact/nasa-sde-IR-benchmark-20251024-v5",
+        "data_files": [
+            "qrels/qa_pairs.tsv",
+            "qrels/search_pairs.tsv",
+        ],
+        "data_files_colors": [
+            "#1f77b4",  # qa_pairs.tsv
+            "#ff7f0e",  # search_pairs.tsv
+        ]
+    },
+    "code_repo_search_benchmark_v1": {
+        "path": "nasa-impact/code_repo_search_benchmark_v1",
+        "data_files": [
+            "qrels/astro.tsv",
+            "qrels/earth.tsv",
+            "qrels/planetary.tsv"
+        ],
+        "data_files_colors": [
+            "#1f77b4",  # astro.tsv
+            "#ff7f0e",  # earth.tsv
+            "#2ca02c",  # planetary.tsv
+        ]
     },
     "nasa_sde_ir_v4": {
         "path": "nasa-impact/nasa-sde-IR-benchmark-sample-v4",
@@ -684,6 +800,7 @@ def get_evaluator(
 
     elif dataset_name.lower() in [
         "nasa_sde_ir_v3",
+        "nasa_sde_ir_20251024_v5",
         "shortform-fullform",
         "nasa_sde_ir_v4",
         "nasa_repo_code_benchmark_v0.1",
@@ -691,6 +808,7 @@ def get_evaluator(
         "nasa_repo_code_benchmark_v0.3",
         "codesearchnet_testset_benchmark_v0.1",
         "codesearchnet_testset_benchmark_v0.2",
+        "code_repo_search_benchmark_v1"
     ]:
         args = dict(
             queries=queries,
@@ -705,8 +823,9 @@ def get_evaluator(
             map_at_k=ks,
             show_progress_bar=True,
             write_csv=True,
-            encode_chunk_size=5000,
+            encode_chunk_size=1000,
             encode_batch_size=batch_size,
+            corpus_chunk_size=500,
         )
         evaluators = {
             **{"cosine": MultiGPUInformationRetrievalEvaluator(**args)},
@@ -750,6 +869,7 @@ def get_evaluator(
     return evaluators
 
 
+# ...existing code...
 def add_mean_metrics(all_results, query_counts, mean_basis="subset"):
     global models
     for model_name in all_results:
@@ -764,7 +884,6 @@ def add_mean_metrics(all_results, query_counts, mean_basis="subset"):
             )
 
         similarity_fn_name = similarity_fn_names.pop()
-        # similarity_fn_name = models.get(model_name, {}).get("similarity_fn_name", "cosine")
         metric_names = set(
             [i.split("_")[-1] for i in list(all_results[model_name].keys())],
         )
@@ -793,6 +912,31 @@ def add_mean_metrics(all_results, query_counts, mean_basis="subset"):
         mean_result = {}
         weighted_mean_result = {}
 
+        def _get_weight_for(mean_name: str) -> int:
+            """
+            Query_counts keys are created in evaluate() as:
+              f'{dataset_name}__{subset if subset is not None else ""}__{data_file if data_file is not None else ""}'
+            For subset means we match keys that start with 'dataset__subset__'
+            For data_file means we match keys that end with '__data_file' (or contain it as the last segment).
+            Fall back to 1 if no matching entry found.
+            """
+            # exact match
+            exact = query_counts.get(mean_name)
+            if exact is not None:
+                return exact
+            # try matching prefixes / suffixes
+            ds_prefix = f"{dataset_name}__{mean_name}__"
+            total = 0
+            found = False
+            for k, v in query_counts.items():
+                if k.startswith(ds_prefix):
+                    total += v
+                    found = True
+                elif k.endswith(f"__{mean_name}") or k.split("__")[-1] == mean_name:
+                    total += v
+                    found = True
+            return total if found else 1
+
         # Calculate the mean for each metric
         for metric in metric_names:
             values = []
@@ -813,8 +957,9 @@ def add_mean_metrics(all_results, query_counts, mean_basis="subset"):
                         f"Found only {list(all_results[model_name].keys())}. Skipping...",
                     )
                     continue
-                weight_key = "__".join(_key_name.split("__")[:2])
-                weight = query_counts.get(weight_key, 1)
+
+                # compute a sensible weight by matching query_counts keys
+                weight = _get_weight_for(mean_basis_name)
                 weighted_values.append(values[-1] * weight)
                 weights.append(weight)
 
@@ -917,7 +1062,7 @@ def pre_compute_corpus_embedding(
             corpus_texts,
             pool=pool,
             batch_size=batch_size,
-            chunk_size=5000,
+            chunk_size=1000,
             show_progress_bar=True,
         )
 
@@ -993,6 +1138,11 @@ def load_model_with_proper_pooling(model_name, model_info):
             print(f"Using SentenceTransformer for {model_name}")
             model = base_model
 
+    if model_info.get("max_seq_length") is not None:
+        print(
+            f"Setting max_seq_length to {model_info['max_seq_length']} for model {model_name}",
+        )
+        model.max_seq_length = int(model_info["max_seq_length"])
     return model
 
 
@@ -1188,108 +1338,192 @@ def convert_json_output_to_df(json_output_path):
     return df
 
 
-def plot_results(json_output_path):
-    print("Plotting results...")
-    # Create a pandas DataFrame
-    df = convert_json_output_to_df(json_output_path)
+def plot_results(
+    json_output_path, 
+    top_ks=[1, 3, 5, 10], 
+    dpi=300, 
+    legend_cols=2,
+    model_name_mapper=None  # <--- Added argument
+):
+    """
+    Plots bar charts for model performance metrics.
+    
+    Args:
+        model_name_mapper (dict, optional): Dictionary mapping internal model names 
+                                            to display names. Defaults to None.
+    
+    Note: This function assumes the following variables are defined in the global scope:
+      - desired_metric_types (list)
+      - models (dict)
+      - embeddings (dict)
+      - dataset_name (str)
+      - output_dir_plots (str)
+      - convert_json_output_to_df (function)
+    """
+    
+    # 0. Set Style for "Beautiful" look
+    sns.set_theme(style="whitegrid", rc={"axes.grid": True, "grid.linestyle": "--", "grid.alpha": 0.6})
 
-    # filter the DataFrame to include only the desired metric types
+    print(f"Plotting results for K values: {top_ks}...")
+    
+    # 1. Load & Filter Data
+    df = convert_json_output_to_df(json_output_path)
     df = df[df["metric"].isin(desired_metric_types)]
+    df = df[df["k"].isin(top_ks)]
+
+    if df.empty:
+        print(f"No data found for K values: {top_ks}.")
+        return
 
     all_model_configs = {**models, **embeddings}
-    model_color_palette = {
-        name: config["color"] for name, config in all_model_configs.items()
-    }
-    sorted_model_names = sorted(all_model_configs.keys())
-    # lets loop through subsets as we will be plotting them separately
+    model_color_palette = {name: config["color"] for name, config in all_model_configs.items()}
+    model_hatch_palette = {name: config.get("hatch", None) for name, config in all_model_configs.items()}
+    
+    present_models = set(df["model"].unique())
+    sorted_model_names = sorted([m for m in all_model_configs.keys() if m in present_models])
+    
     for subset in df["subset"].unique():
         subset_df = df[df["subset"] == subset]
 
         for data_file in subset_df["data_file"].unique():
             subset_data_file_df = subset_df[subset_df["data_file"] == data_file]
 
-            # Create the bar plot using seaborn's catplot for faceting
-            # Create the bar plot
+            # === GENERATE PLOT ===
+            # We use the original names here to maintain color/hatch mapping consistency
             g = sns.catplot(
                 data=subset_data_file_df,
-                x="k",
-                y="value",
-                hue="model",
-                hue_order=sorted_model_names,
-                col="metric",
-                kind="bar",
-                col_wrap=2,
-                sharey=False,
+                x="k", y="value", hue="model",
+                hue_order=sorted_model_names, 
+                col="metric", kind="bar",
+                col_wrap=2, sharey=False,
+                legend_out=True, palette=model_color_palette,
                 height=5,
-                aspect=2,
-                legend_out=True,
-                palette=model_color_palette,
+                aspect=3.5,
+                edgecolor="black",     
+                linewidth=0.8
             )
 
-            # Customize subplot titles and labels
-            g.set_titles("Metric: {col_name}")
-            g.set_axis_labels("K Value", "Score")
-            g.despine(left=True)
+            # Apply Hatches
+            for ax in g.axes.flat:
+                for i, container in enumerate(ax.containers):
+                    if i < len(sorted_model_names):
+                        model_name = sorted_model_names[i]
+                        hatch = model_hatch_palette.get(model_name)
+                        if hatch:
+                            for bar in container:
+                                bar.set_hatch(hatch)
+                                # Draw hatch lines in white by using white edgecolor
+                                bar.set_edgecolor("white")
+                                # Slightly widen edge so hatch is visible
+                                bar.set_linewidth(0.9)
+                        else:
+                            # keep a visible border for non-hatched bars
+                            for bar in container:
+                                bar.set_edgecolor("black")
+                                bar.set_linewidth(0.8)
 
-            # Add value labels on top of each bar
+            # Titles and Labels
+            g.set_titles("{col_name}")  
+            g.set_axis_labels("K Value", "Score")
+            g.despine(left=True, bottom=True)
+
+            # Annotations (Values on top of bars)
             for ax in g.axes.flat:
                 for p in ax.patches:
-                    value = f"{p.get_height():.2f}"
-                    x = p.get_x() + p.get_width() / 2
-                    y = p.get_height()
-                    ax.annotate(
-                        value,
-                        (x, y),
-                        ha="center",
-                        va="center",
-                        xytext=(0, 5),
-                        textcoords="offset points",
-                        fontsize=9,
-                    )
+                    if hasattr(p, 'get_height') and p.get_height() > 0:
+                        ax.annotate(
+                            f"{p.get_height():.2f}", 
+                            (p.get_x() + p.get_width() / 2, p.get_height()), 
+                            ha="center", va="bottom", xytext=(0, 2), 
+                            textcoords="offset points", fontsize=9, fontweight='bold'
+                        )
 
-            # 1. Move the legend to be centered below the plot
-            sns.move_legend(
-                g,
-                "lower center",
-                bbox_to_anchor=(
-                    0.5,
-                    -0.2,
-                ),  # Center the legend horizontally, move it down
-                ncol=6,  # Adjust number of columns to fit your models (image has 10)
-                title=None,
-                frameon=False,
+            # === CUSTOM LEGEND HANDLES ===
+            legend_handles = []
+            for m in sorted_model_names:
+                display_label = model_name_mapper.get(m, m) if model_name_mapper else m
+                
+                edge_color = "white" if model_hatch_palette.get(m) else "black"
+                line_width = 0.9 if model_hatch_palette.get(m) else 0.5
+
+                handle = Patch(
+                    facecolor=model_color_palette.get(m),
+                    hatch=model_hatch_palette.get(m),
+                    label=display_label, 
+                    edgecolor=edge_color,
+                    linewidth=line_width
+                )
+                legend_handles.append(handle)
+
+            # Clear default legends
+            if g.legend: g.legend.remove()
+            if g.fig.legends: 
+                for legend in g.fig.legends: legend.remove()
+
+
+            # === FIX 1: Define Layout Variables ===
+            # We define these explicitly so we can use them to calculate the center
+            plt_left = 0.1
+            plt_right = 0.95
+            plt_bottom = 0.15
+            plt_top = 0.85
+
+            g.fig.subplots_adjust(
+                bottom=plt_bottom, 
+                top=plt_top, 
+                left=plt_left, 
+                right=plt_right
             )
 
-            # 2. Add the main title for the figure
-            title = f"Model Performance at K-Value On {dataset_name}"
-            if subset != "":
-                title += f" - Subset: {subset}"
-            if data_file is not None or data_file != "":
-                title += f" - Data File: {data_file}"
+
+
+            # === FIX 2: Legend Centering ===
+            # Instead of magic number 0.3, we anchor to the exact visual center (0.5)
+            # loc='upper center' means the Top-Middle of the legend box attaches to the anchor point
+            g.fig.legend(
+                handles=legend_handles,
+                loc="upper center",       
+                bbox_to_anchor=(0.3, 0.02), # x=0.2 (center), y=0.02 (very bottom)
+                ncol=legend_cols,
+                frameon=False,
+                fontsize=10,
+                columnspacing=1.5        
+            )
+            
+
+            title = f"Model Performance on {dataset_name} benchmark"
+            if subset and subset != "None":
+                title += f" - {subset}"
+            if data_file and data_file not in [None, "None", ""]:
+                # append just the file basename for readability
+                title += f" - {os.path.basename(data_file)}"
+
+            # === FIX 3: Calculate Title Center ===
+            # The visual center is the midpoint between the left and right margins
+            # visual_center_x = (plt_left + plt_right) / 2
+
             g.fig.suptitle(
                 title,
-                fontsize=16,  # Optional: Adjust font size
+                fontsize=15,
+                y=0.96,
+                x=0.3,
+                fontweight="bold",
+                ha="center",
             )
 
-            # 3. Use tight_layout to automatically adjust spacing and center the title
-            # The rect parameter makes space for the suptitle at the top
-            plt.tight_layout(rect=[0, 0, 1, 0.95])
-
-            # 4. Save the figure
-            # The bbox_inches="tight" argument is crucial for including the legend
+            # Save
             os.makedirs(os.path.join(output_dir_plots, dataset_name), exist_ok=True)
             plt.savefig(
                 os.path.join(
-                    output_dir_plots,
-                    dataset_name,
-                    f"{dataset_name}_{subset}_{data_file.split('/')[-1]}_performance_plots.png",
+                    output_dir_plots, dataset_name,
+                    f"{dataset_name}_{subset}_{data_file.split('/')[-1] if data_file else 'all'}.png"
                 ),
-                bbox_inches="tight",
-                dpi=300,  # Optional: Increase image resolution
+                bbox_inches="tight", 
+                dpi=dpi
             )
+            plt.close(g.fig)
 
-
-def plot_data_files_based_eval(json_output_path):
+def plot_data_files_based_eval(json_output_path, top_ks=[1, 3, 5, 10]):
     print("Plotting data files based evaluation...")
     df = convert_json_output_to_df(json_output_path)
 
@@ -1317,6 +1551,14 @@ def plot_data_files_based_eval(json_output_path):
             dataset_config[dataset_name].get("data_files_colors", [None]),
         )
     }
+    # Add hatch patterns for data files too
+    # dataset_hatch_palette = {
+    #     name: hatch
+    #     for name, hatch in zip(
+    #         dataset_config[dataset_name].get("data_files", [None]),
+    #         dataset_config[dataset_name].get("data_files_hatches", [None] * len(dataset_config[dataset_name].get("data_files", []))),
+    #     )
+    #     }
     # loop through differnt models: each model will have its own plot
     for model_name in df["model"].unique():
         df_model = df[df["model"] == model_name]
@@ -1398,5 +1640,11 @@ if __name__ == "__main__":
     if not just_plot:
         evaluate()
 
-    plot_results(json_output_path)
-    plot_data_files_based_eval(json_output_path)
+    model_name_mapper = {
+        model_name: model_info["display_name"]
+        for model_name, model_info in models.items()
+        if "display_name" in model_info
+    }
+
+    plot_results(json_output_path, plotks, model_name_mapper=model_name_mapper, legend_cols=3)
+    plot_data_files_based_eval(json_output_path, plotks)

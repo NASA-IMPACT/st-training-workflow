@@ -187,4 +187,5 @@ wandb
 training_output
 .venv*/
 
-eval/
+# eval/
+gen_code_data/nasa_science/nasa_repos_with_file_paths/
