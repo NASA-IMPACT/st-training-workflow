@@ -2,6 +2,88 @@
 
 This repository provides a comprehensive workflow for fine-tuning Sentence Transformer models using PyTorch, Hugging Face `datasets`, and `transformers`. It is designed for multi-GPU training using `torchrun` and supports features like dataset pre-tokenization, Weights & Biases logging, and custom learning rate schedulers.
 
+---
+
+## INDUS-SDE-ST — Sentence Transformer for Scientific Content Discovery
+
+These workflows produce **INDUS-SDE-ST**, the semantic-discovery model from our paper:
+
+> **INDUS-SDE: A Language Model for Scientific Content Curation and Discovery**
+> Pantha et al. — **KDD 2026, AI for Sciences Track** · DOI: [10.1145/3770855.3818847](https://doi.org/10.1145/3770855.3818847)
+
+**INDUS-SDE** is a domain-adapted encoder pretrained with Weighted Dynamic Masking on NASA's Science Discovery Engine (SDE) corpus (pretraining code: [`NASA-IMPACT/mlm-fine-tuning`](https://github.com/NASA-IMPACT/mlm-fine-tuning)). **INDUS-SDE-ST** — built here — fine-tunes that encoder into a sentence transformer for semantic retrieval over heterogeneous, web-sourced scientific content.
+
+### Models & data
+| Artifact | Hugging Face |
+|---|---|
+| Sentence transformer | [`nasa-impact/indus-sde-st-v0.2`](https://huggingface.co/nasa-impact/indus-sde-st-v0.2) |
+| Binary (EQAT) embeddings | [`nasa-impact/indus-sde-st-equat-v0.1`](https://huggingface.co/nasa-impact/indus-sde-st-equat-v0.1) |
+| Base encoder (INDUS-SDE) | [`nasa-impact/indus-sde-v0.2`](https://huggingface.co/nasa-impact/indus-sde-v0.2) |
+| NASA SDE IR benchmark | [`nasa-impact/nasa-sde-IR-benchmark-20251024-v5`](https://huggingface.co/datasets/nasa-impact/nasa-sde-IR-benchmark-20251024-v5) |
+| Pretraining (MLM / WDM) code | [`NASA-IMPACT/mlm-fine-tuning`](https://github.com/NASA-IMPACT/mlm-fine-tuning) |
+
+### Where the paper's data pipeline lives
+- Stage-2 synthetic pair generation (Instructor schema + system prompt) → [`gen_data_stage2/`](gen_data_stage2/) · [module README](gen_data_stage2/README.md)
+- SDE content-relevancy filtering (Pydantic AI) → [`gen_data_stage2/filter2_llm_based/`](gen_data_stage2/filter2_llm_based/)
+- Stage-2 data prep / CMR–PDS pairs → [`data_prep/`](data_prep/)
+- Benchmark & per-checkpoint eval dumps → [`eval/results_json/`](eval/results_json/)
+
+### NASA SDE IR — headline result (vs. released models)
+
+On the in-domain **NASA SDE IR benchmark** ([`nasa-impact/nasa-sde-IR-benchmark-20251024-v5`](https://huggingface.co/datasets/nasa-impact/nasa-sde-IR-benchmark-20251024-v5)), INDUS-SDE-ST is the strongest retriever among released models (the comparison reported in the paper):
+
+| Model | MRR@1 | MRR@5 | NDCG@1 | NDCG@5 |
+|---|---|---|---|---|
+| INDUS-ST | 0.1616 | 0.2131 | 0.1616 | 0.2351 |
+| ModernBERT-ST | 0.1765 | 0.2137 | 0.1765 | 0.2288 |
+| **INDUS-SDE-ST** | **0.2343** | **0.3122** | **0.2343** | **0.3445** |
+| OpenAI text-embedding-3-small | 0.2034 | 0.2619 | 0.2034 | 0.2870 |
+
+> **Note:** INDUS-SDE-ST is the best **in-domain** retriever among released models (above). The Stage-2 ablation below compares *internal* training checkpoints; one unreleased run (`dutiful-thunder-110`) scores slightly higher on NASA SDE IR by pushing in-domain harder, but it trades away NanoBEIR and NASA SMD IR — so the **balanced** checkpoint (INDUS-SDE-ST) was the one released.
+
+### Stage-2 checkpoint ablation (extended results)
+
+Full run-by-run Stage-2 evaluation of internal checkpoints across all three benchmarks.
+
+<table>
+<thead>
+<tr>
+  <th rowspan="3">SN</th><th rowspan="3">Checkpoint</th><th rowspan="3">Training approach</th>
+  <th colspan="4">NanoBEIR</th><th colspan="4">NASA SMD IR</th><th colspan="4">NASA SDE IR</th>
+</tr>
+<tr>
+  <th colspan="2">MRR</th><th colspan="2">NDCG</th>
+  <th colspan="2">MRR</th><th colspan="2">NDCG</th>
+  <th colspan="2">MRR</th><th colspan="2">NDCG</th>
+</tr>
+<tr>
+  <th>@1</th><th>@5</th><th>@1</th><th>@5</th>
+  <th>@1</th><th>@5</th><th>@1</th><th>@5</th>
+  <th>@1</th><th>@5</th><th>@1</th><th>@5</th>
+</tr>
+</thead>
+<tbody>
+<tr><td>1</td><td>INDUS-ST</td><td>Baseline</td><td>0.50</td><td><b>0.61</b></td><td>0.50</td><td>0.54</td><td><b>0.53</b></td><td><b>0.58</b></td><td><b>0.53</b></td><td><b>0.61</b></td><td>0.16</td><td>0.21</td><td>0.16</td><td>0.23</td></tr>
+<tr><td>2</td><td>indus-sde-st-v0.1</td><td>Stage 1 ST</td><td><b>0.52</b></td><td><b>0.61</b></td><td><b>0.52</b></td><td><b>0.55</b></td><td>0.47</td><td>0.53</td><td>0.47</td><td>0.55</td><td><b>0.19</b></td><td><b>0.24</b></td><td><b>0.19</b></td><td><b>0.26</b></td></tr>
+<tr><td colspan="15"><em>Stage 2 Training Experiments (FP32)</em></td></tr>
+<tr><td>3</td><td>whole-moon-14</td><td>Trained on full Stage 2 data</td><td>0.40</td><td>0.51</td><td>0.40</td><td>0.45</td><td>0.38</td><td>0.45</td><td>0.38</td><td>0.47</td><td>0.17</td><td>0.23</td><td>0.17</td><td>0.26</td></tr>
+<tr><td>4</td><td>atomic-plasma-15</td><td>Stage 2 subset (NASA-SDE + ADS)</td><td><b>0.54</b></td><td><b>0.63</b></td><td><b>0.54</b></td><td><b>0.56</b></td><td><b>0.48</b></td><td><b>0.54</b></td><td><b>0.48</b></td><td><b>0.57</b></td><td>0.19</td><td>0.25</td><td>0.19</td><td>0.28</td></tr>
+<tr><td>5</td><td>peach-night-57</td><td>Stage 2 (No Cite) + weighted sources</td><td>0.46</td><td>0.57</td><td>0.46</td><td>0.51</td><td>0.45</td><td>0.51</td><td>0.45</td><td>0.54</td><td>0.23</td><td>0.30</td><td>0.23</td><td>0.34</td></tr>
+<tr><td>6</td><td>INDUS-SDE-ST</td><td>Best Stage 2: peach-night-57 + Stage 1 (anti-forgetting)</td><td>0.47</td><td>0.58</td><td>0.47</td><td>0.51</td><td><b>0.48</b></td><td><b>0.54</b></td><td><b>0.48</b></td><td>0.56</td><td>0.23</td><td>0.31</td><td>0.23</td><td>0.34</td></tr>
+<tr><td>7</td><td>dutiful-thunder-110</td><td>Stage 2 (No Cite) + S1; NASA-SDE 0.75x, Tanh</td><td>0.43</td><td>0.55</td><td>0.43</td><td>0.49</td><td>0.43</td><td>0.50</td><td>0.43</td><td>0.52</td><td><b>0.26</b></td><td><b>0.34</b></td><td><b>0.26</b></td><td><b>0.37</b></td></tr>
+<tr><td colspan="15"><em>Binary (1-bit) &amp; EQAT Variants</em></td></tr>
+<tr><td>8</td><td>INDUS-SDE-ST-PB</td><td>1-bit post-training binarization of INDUS-SDE-ST</td><td><b>0.43</b></td><td><b>0.55</b></td><td><b>0.43</b></td><td><b>0.49</b></td><td><b>0.42</b></td><td><b>0.49</b></td><td><b>0.42</b></td><td><b>0.51</b></td><td>0.21</td><td>0.28</td><td>0.21</td><td>0.31</td></tr>
+<tr><td>9</td><td>azure-eon-73</td><td>EQAT start: 1-bit, Stage 2 (No Cite), weighted</td><td>0.38</td><td>0.47</td><td>0.38</td><td>0.41</td><td>0.25</td><td>0.31</td><td>0.25</td><td>0.33</td><td>0.21</td><td>0.27</td><td>0.21</td><td>0.30</td></tr>
+<tr><td>10</td><td>absurd-snowflake-85</td><td>INDUS-SDE-ST config + 1-bit EQAT</td><td>0.41</td><td>0.51</td><td>0.41</td><td>0.44</td><td>0.28</td><td>0.34</td><td>0.28</td><td>0.36</td><td>0.21</td><td>0.28</td><td>0.21</td><td>0.30</td></tr>
+<tr><td>11</td><td>INDUS-SDE-ST-EQAT</td><td>Best EQAT: Stage 2 (No Cite) + S1; NASA-SDE 0.75x</td><td>0.41</td><td>0.51</td><td>0.41</td><td>0.44</td><td>0.32</td><td>0.38</td><td>0.32</td><td>0.40</td><td>0.22</td><td>0.29</td><td>0.22</td><td>0.31</td></tr>
+<tr><td>12</td><td>eternal-energy-94</td><td>ST-EQAT config, NASA-SDE removed</td><td>0.40</td><td>0.51</td><td>0.40</td><td>0.44</td><td>0.30</td><td>0.37</td><td>0.30</td><td>0.39</td><td>0.10</td><td>0.13</td><td>0.10</td><td>0.14</td></tr>
+<tr><td>13</td><td>wandering-snowflake-98</td><td>ST-EQAT config, weight_decay 0.1</td><td>0.41</td><td>0.51</td><td>0.41</td><td>0.45</td><td>0.29</td><td>0.36</td><td>0.29</td><td>0.38</td><td>0.21</td><td>0.28</td><td>0.21</td><td>0.31</td></tr>
+<tr><td>14</td><td>dutiful-thunder-PB</td><td>1-bit post-binarization of thunder-110 (Tanh)</td><td>0.41</td><td>0.51</td><td>0.41</td><td>0.45</td><td>0.37</td><td>0.42</td><td>0.37</td><td>0.44</td><td><b>0.23</b></td><td><b>0.31</b></td><td><b>0.23</b></td><td><b>0.34</b></td></tr>
+</tbody>
+</table>
+
+*INDUS-SDE-ST is the best Stage-2 FP32 model; INDUS-SDE-ST-EQAT is the deployed 1-bit variant (10–16× storage reduction).*
+
 ## 1. Prerequisites
 
 Before you begin, ensure you have the following installed and configured:
@@ -142,3 +224,22 @@ You can customize the training run using various command-line arguments. Here ar
 * **`distributed.py`**: Provides utilities for setting up and managing the distributed training environment.
 * **`pretokenize.py`**: Contains the logic for pre-tokenizing the datasets and caching them to disk to accelerate subsequent training runs.
 * **`requirements.txt`**: A list of Python packages required to run the code.
+
+## Citation
+
+If you use INDUS-SDE, INDUS-SDE-ST, or these workflows in your research, please cite:
+
+```bibtex
+@inproceedings{pantha2026indussde,
+  author    = {Pantha, Nishan and Awale, Sajil and Kuruvanthodi, Vishnudev and KC, Simran and Ramasubramanian, Muthukumaran and Davis, Carson and Praveen, Bishwas and Foshee, Emily and Bhattacharjee, Bishwaranjan and Bugbee, Kaylin and Ramachandran, Rahul},
+  title     = {{INDUS-SDE}: A Language Model for Scientific Content Curation and Discovery},
+  year      = {2026},
+  isbn      = {979-8-4007-2259-2},
+  publisher = {Association for Computing Machinery},
+  address   = {New York, NY, USA},
+  doi       = {10.1145/3770855.3818847},
+  booktitle = {Proceedings of the 32nd ACM SIGKDD Conference on Knowledge Discovery and Data Mining V.2 (KDD 2026)},
+  location  = {Jeju Island, Republic of Korea},
+  series    = {KDD '26}
+}
+```
