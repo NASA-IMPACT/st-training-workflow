@@ -238,7 +238,7 @@ If you use INDUS-SDE, INDUS-SDE-ST, or these workflows in your research, please 
   publisher = {Association for Computing Machinery},
   address   = {New York, NY, USA},
   doi       = {10.1145/3770855.3818847},
-  booktitle = {Proceedings of the 32nd ACM SIGKDD Conference on Knowledge Discovery and Data Mining V.2 (KDD 2026)},
+  booktitle = {Proceedings of the 32nd ACM SIGKDD Conference on Knowledge Discovery and Data Mining V.2 (KDD '26)},
   location  = {Jeju Island, Republic of Korea},
   series    = {KDD '26}
 }
